@@ -1,0 +1,38 @@
+.
+├── data
+│   └── shop1.yaml
+├── diplom_tree.txt
+├── README.md
+├── reference
+│   ├── api.md
+│   ├── my_diplom
+│   │   ├── backend
+│   │   │   ├── admin.py
+│   │   │   ├── apps.py
+│   │   │   ├── __init__.py
+│   │   │   ├── models.py
+│   │   │   ├── serializers.py
+│   │   │   ├── signals.py
+│   │   │   ├── tests.py
+│   │   │   ├── urls.py
+│   │   │   └── views.py
+│   │   ├── manage.py
+│   │   ├── netology_pd_diplom
+│   │   │   ├── __init__.py
+│   │   │   ├── settings.py
+│   │   │   ├── urls.py
+│   │   │   └── wsgi.py
+│   │   ├── README.md
+│   │   └── requirements.txt
+│   ├── screens.md
+│   ├── service.md
+│   ├── step-1.md
+│   ├── step-2.md
+│   ├── step-3.md
+│   ├── step-4.md
+│   ├── step-5.md
+│   ├── step-6-adv.md
+│   └── step-7-adv.md
+└── requirements.txt
+
+5 directories, 30 files
