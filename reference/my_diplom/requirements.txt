@@ -1,0 +1,9 @@
+django
+djangorestframework
+django-rest-passwordreset
+psycopg2-binary
+python-dotenv
+pyyaml
+ujson
+requests
+setuptools
