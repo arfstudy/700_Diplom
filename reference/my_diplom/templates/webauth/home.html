@@ -6,7 +6,18 @@
 
   {% if user.is_authenticated %}
 
-    <p>Logout</p>
+    <!-- Выйти из системы можно только методом "POST". Для этого организована форма. -->
+    <!-- Никакие данные вводить в эту форму не требуется. Нужна только кнопка "Выйти". -->
+    <form action="{% url 'web:logout' %}" method="POST">
+      {% csrf_token %}
+
+      <p>
+
+        <!-- Эту кнопку маскируем под ссылку. -->
+        <input type="submit" class="btn btn-link" value="Logout">
+
+      </p>
+    </form>
 
   {% else %}
 

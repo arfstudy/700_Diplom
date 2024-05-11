@@ -1,5 +1,5 @@
 from django.contrib.auth import authenticate, get_user_model, login
-from django.contrib.auth.views import LoginView
+from django.contrib.auth.views import LoginView, LogoutView
 from django.shortcuts import redirect, render
 
 from webauth.forms import AppAuthenticationForm
@@ -33,3 +33,12 @@ class UserLoginView(LoginView):
             'form': form
         }
         return render(request, template_name=self.template_name, context=data)
+
+
+class UserLogoutView(LogoutView):
+    """ Класс для выхода из системы.
+        Шаблона выхода: 'reference/netology_pd_diplom/templates/registration/logout.html'
+    """
+    # Присутствие шаблона 'logged_out.html' в папке 'reference/netology_pd_diplom/templates/registration/'
+    # перехватывает корректный выход из административной панели - 'admin/logout/'.
+    template_name = "registration/logout.html"
