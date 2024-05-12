@@ -13,4 +13,6 @@ app_name = 'web'
 urlpatterns = [
     path('login/', views.UserLoginView.as_view(), name='login'),
     path('logout/', views.UserLogoutView.as_view(), name='logout'),
+
+    path('inspect/', views.UserInspectView.as_view(), name='inspect'),
 ]

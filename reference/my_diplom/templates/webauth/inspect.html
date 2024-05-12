@@ -1,0 +1,24 @@
+{% extends 'webauth/base.html' %}
+
+{% block content %}
+  <h1>Inspect</h1>
+  <hr>
+
+  {% for user in users %}
+
+    <li>
+    {% if user.is_authenticated %}
+      <span>В системе&nbsp; &nbsp; &nbsp;- </span>
+    {% else %}
+      <span>Не в системе - </span>
+    {% endif %}
+
+    <span>{{ user }}</span>
+    </li>
+
+  {% empty %}
+    <li>Пустой список пользователей.</li>
+  {% endfor %}
+
+  <hr>
+{% endblock %}
