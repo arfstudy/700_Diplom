@@ -40,16 +40,17 @@ urlpatterns = [
     ),
     path("password_reset/", views.AppPasswordResetView.as_view(), name="password_reset"),
     path("reset/<uidb64>/<token>/",views.AppPasswordResetConfirmView.as_view(),name="password_reset_confirm"),
+    path("password_change/", views.AppPasswordChangeView.as_view(), name="password_change"),
     path('', include(arg='django.contrib.auth.urls')),
     # Находится: 700_Diplom/700_venv/lib/python3.12/site-packages/django/contrib/auth/urls.py
-    #  login/  [name='login']                                   # Перехвачен.
-    #  logout/  [name='logout']                                 # Перехвачен.
-    #  password_change/  [name='password_change']
-    #  password_change/done/  [name='password_change_done']
-    #  password_reset/  [name='password_reset']                 # Перехвачен.
-    #  password_reset/done/  [name='password_reset_done']
-    #  reset/<uidb64>/<token>/  [name='password_reset_confirm'] # Перехвачен.
-    #  reset/done/  [name='password_reset_complete']
+    #  login/  [name='login']                                   # Переопределён.
+    #  logout/  [name='logout']                                 # Переопределён.
+    #  password_change/  [name='password_change']               # Переопределён.
+    #  password_change/done/  [name='password_change_done']     # 1. Работает.
+    #  password_reset/  [name='password_reset']                 # Переопределён.
+    #  password_reset/done/  [name='password_reset_done']       # 2. Работает.
+    #  reset/<uidb64>/<token>/  [name='password_reset_confirm'] # Переопределён.
+    #  reset/done/  [name='password_reset_complete']            # 3. Работает.
 
     path('inspect/', views.UserInspectView.as_view(), name='inspect'),
 ]
