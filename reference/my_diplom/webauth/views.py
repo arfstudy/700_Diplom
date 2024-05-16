@@ -1,6 +1,7 @@
 from django.contrib.auth import authenticate, get_user_model, login, logout
-from django.contrib.auth.views import LoginView, LogoutView
+from django.contrib.auth.views import LoginView, LogoutView, PasswordResetView, PasswordResetConfirmView
 from django.shortcuts import redirect, render
+from django.urls import reverse_lazy
 from django.views import View
 from django.views.generic import UpdateView, DeleteView
 
@@ -186,6 +187,20 @@ class UserDeleteView(DeleteView):
             'form': UserDeleteForm(),
         }
         return render(request, template_name=self.template_confirm, context=data)
+
+
+class AppPasswordResetView(PasswordResetView):
+    """ Класс, который отправляет сообщение по электронной почте и переходит к отображению страницы
+        сайта с отображением успешности выполнения.
+    """
+    success_url = reverse_lazy("web:password_reset_done")
+
+
+class AppPasswordResetConfirmView(PasswordResetConfirmView):
+    """ Класс, который проверяет ссылку из письма пользователя и выводит форму для ввода нового пароля.
+        Переходит к отображению страницы сайта с отображением успешности выполнения восстановления пароля.
+    """
+    success_url = reverse_lazy("web:password_reset_complete")
 
 
 class UserInspectView(View):
