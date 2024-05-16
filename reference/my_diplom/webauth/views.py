@@ -1,5 +1,6 @@
 from django.contrib.auth import authenticate, get_user_model, login, logout
-from django.contrib.auth.views import LoginView, LogoutView, PasswordResetView, PasswordResetConfirmView
+from django.contrib.auth.views import (LoginView, LogoutView, PasswordResetView, PasswordResetConfirmView,
+    PasswordChangeView)
 from django.shortcuts import redirect, render
 from django.urls import reverse_lazy
 from django.views import View
@@ -201,6 +202,13 @@ class AppPasswordResetConfirmView(PasswordResetConfirmView):
         Переходит к отображению страницы сайта с отображением успешности выполнения восстановления пароля.
     """
     success_url = reverse_lazy("web:password_reset_complete")
+
+
+class AppPasswordChangeView(PasswordChangeView):
+    """ Класс, который выводит форму для ввода нового пароля и переходит к странице
+        сайта с отображением успешности выполнения.
+    """
+    success_url = reverse_lazy("web:password_change_done")
 
 
 class UserInspectView(View):
