@@ -147,8 +147,12 @@ STATIC_URL = 'static/'
 AUTH_USER_MODEL='users.User'
 
 
+# Адрес перенаправления пользователя после успешного входа, (если параметра next в запросе нет).
+LOGIN_REDIRECT_URL = '/'     # По умолчанию 'accounts/profile/'
+
+
 # Настройки почтового сервера.
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'    # Для отладки.
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'    # Для отладки.
 # EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 
 EMAIL_HOST = os.getenv('EMAIL_HOST')
