@@ -6,7 +6,12 @@ The `urlpatterns` list routes URLs to views. For more information please see:
 """
 from django.urls import path
 
+from webauth import views
+
 app_name = 'web'
 
 urlpatterns = [
+    path(
+        'login/', views.UserLoginView.as_view(), name='login'
+    ),
 ]

@@ -1,3 +1,35 @@
-from django.shortcuts import render
+from django.contrib.auth import authenticate, get_user_model, login
+from django.contrib.auth.views import LoginView
+from django.shortcuts import redirect, render
 
-# Create your views here.
+from webauth.forms import AppAuthenticationForm
+
+User = get_user_model()
+
+
+class UserLoginView(LoginView):
+    """ Класс для выполнения входа в систему пользователем.
+    """
+    form_class = AppAuthenticationForm
+
+    def post(self, request, *args, **kwargs):
+        """ Создаёт экземпляр формы с переданными переменными из POST-запроса,
+            проверяет их и регистрирует пользователя в системе.
+        """
+        form = self.get_form()
+
+        if form.is_valid():
+            email = form.cleaned_data.get('username')
+            password = form.cleaned_data.get('password')
+            user = authenticate(request, email=email, password=password)
+
+            # Проверка подтверждённости почты.
+
+            login(request, user)
+            return redirect('home')
+
+        # Если введённые значения не корректны, то возвратить эти значения.
+        data = {
+            'form': form
+        }
+        return render(request, template_name=self.template_name, context=data)
