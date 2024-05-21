@@ -1,0 +1,14 @@
+{% extends 'webauth/base.html' %}
+
+{% block content %}
+  <h1>Подтверждение электронной почты</h1>
+  <hr>
+
+  <h4>{{ header }}</h4>
+
+  {% for line in msg %}
+    <p>{{ line }}</p>
+  {% endfor %}
+
+  <hr>
+{% endblock %}
