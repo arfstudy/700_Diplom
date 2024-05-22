@@ -67,11 +67,20 @@ def describe_keys_verify_result(data, is_verify):
     if is_verify:
         if data['process'] == 'register':
             msg2 = 'Вы успешно зарегистрированы.'
+        elif data['process'] == 'update':
+            msg2 = 'Ваши данные успешно изменены.'
     else:
         msg1 = [('Ссылка для подтверждения почты оказалась недействительной, возможно, потому'
                  ', что она уже использовалась.')]
         if data['process'] in ['login', 'register']:
             msg2 = 'Попробуйте ещё раз.'
+        elif data['process'] == 'update':
+            msg2 = 'Все изменения отменены.'
+            if 'is_restore' in data.keys() and not data['is_restore']:
+                msg1 = ['Внимание! Возможно, что Ваши данные изменились по ошибке.', ('Если Вы внесли какие-либо '
+                        'изменения в поля формы, то они сохранились в БД, несмотря на то, что почта оказалась '
+                         'недействительной.')]
+                msg2 = 'Вам необходимо обратиться к администратору сайта.'
 
     msg1.append(msg2)
     data[data['process']] = msg1

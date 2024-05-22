@@ -69,3 +69,45 @@ def delete_tentative_user(user):
         return False
 
     return True
+
+
+def get_user_fields_dict(user, changed_list=None, FormClass=None):
+    """ Получает словарь из полей пользователя 'user'.
+        Класс формы 'FormClass' передаю в функцию в виде параметра, чтобы избежать перекрёстного импорта
+        между модулями 'reference/my_diplom/users/services.py' и 'reference/my_diplom/users/forms.py'.
+    """
+    if changed_list is None:
+        form = FormClass()
+        changed_list = form.Meta.fields
+    fields_dict = {}
+    for key in changed_list:
+        fields_dict[key] = getattr(user, key, "")    # Здесь 'key: str'.
+
+    return fields_dict
+
+
+def save_old_user(user, changed_list):
+    """ Сохраняет значения полей пользователя, полученные из списка 'changed_list' (подлежащие изменению).
+    """
+    user_fields = get_user_fields_dict(user, changed_list=changed_list)
+    user_fields['changed_data'] = changed_list
+    user_fields['pk'] = user.pk
+
+    return user_fields
+
+
+def is_restore_old_user(old_user_fields, user):
+    """ Восстанавливает у пользователя его старое содержимое полей.
+        Индекс в таблице БД 'pk', список изменённых полей 'changed_data' и сами
+        значения этих полей получает из словаря 'old_user_fields'.
+        Возвращает признак успешности выполненной операции.
+    """
+    changed_data = old_user_fields.pop('changed_data', [])
+    pk = old_user_fields.pop('pk', 0)
+    if not (changed_data and user.pk == pk):
+        return False
+
+    for key in changed_data:
+        setattr(user, key, old_user_fields[key])
+    user.save(update_fields=changed_data)
+    return True
