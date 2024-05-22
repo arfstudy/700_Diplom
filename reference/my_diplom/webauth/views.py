@@ -2,13 +2,15 @@ from django.contrib.auth import authenticate, get_user_model, login
 from django.contrib.auth.views import LoginView, LogoutView
 from django.shortcuts import redirect, render
 from django.views import View
+from django.views.generic import UpdateView
 
 from users.emails import send_verify_email
-from users.services import get_user
-from webauth.forms import AppAuthenticationForm, AppUserCreationForm
+from users.services import get_user, get_user_fields_dict, save_old_user
+from webauth.forms import AppAuthenticationForm, AppUserCreationForm, AppUserChangeForm
 from webauth.services import verify_received_email
 
 User = get_user_model()
+OLD_VALUES = {}
 
 
 class UserLoginView(LoginView):
@@ -57,14 +59,17 @@ class UserLogoutView(LogoutView):
 
 class UserEmailVerifyView(View):
     """ Класс для подтверждения email.
-        Проверяет корректность ссылки, полученной от пользователя.
     """
     template_verify = 'registration/email_verify_confirm.html'
 
     def get(self, request, key64, token):
+        """ Проверяет корректность ссылки, полученной от пользователя.
+        """
+        global OLD_VALUES
 
-        data = verify_received_email(request, key64, token)
+        data = verify_received_email(request, key64, token, OLD_VALUES)
 
+        OLD_VALUES.clear()
         return render(request, template_name=self.template_verify, context=data)
 
 
@@ -100,6 +105,54 @@ class UserRegisterView(View):
             'form': form
         }
         return render(request, template_name=self.template_name, context=data)
+
+
+class UserUpdateView(UpdateView):
+    """ Контроллер, который изменяет персональные данные пользователя.
+        (instance - "старый" объект, после валидации становится "новым" объектом,
+        validated_data - "новые" значения полей объекта.)
+    """
+    template_update = 'webauth/user_update.html'
+    template_complete = 'webauth/user_update_complete.html'
+    message_template = 'registration/web_verify_email.html'
+    done_url = 'web:email_verify_done'
+
+    def get(self, request, *args, **kwargs):
+        form = AppUserChangeForm(initial=get_user_fields_dict(request.user, FormClass=AppUserChangeForm))
+        data = {'form': form}
+        return render(request, template_name=self.template_update, context=data)
+
+    def post(self, request, *args, **kwargs):
+        """ Создаёт экземпляр формы с переданными переменными,
+            а затем проверяет эти данные.
+        """
+        global OLD_VALUES
+
+        form = AppUserChangeForm(request.POST, instance=get_user(request.user.pk))
+        if form.has_changed():
+
+            if form.is_valid():
+
+                form.save()
+                changed_list = form.changed_data
+                if 'email' in changed_list:
+                    form.instance.email_verify = False
+                    form.save()
+
+                    OLD_VALUES = save_old_user(request.user, changed_list)
+
+                    send_verify_email(request, form.instance, 'update', self.message_template)
+                    return redirect(self.done_url)
+
+                return render(request, template_name=self.template_complete, context={'is_changed': True})
+
+            # Если введённые значения не корректны, то возвратить эти значения.
+            data = {
+                'form': form
+            }
+            return render(request, template_name=self.template_update, context=data)
+
+        return render(request, template_name=self.template_complete, context={'is_changed': False})
 
 
 class UserInspectView(View):

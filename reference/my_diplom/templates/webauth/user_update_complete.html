@@ -1,0 +1,27 @@
+{% extends 'webauth/base.html' %}
+
+{% block content %}
+  <h1>Изменение персональных данных</h1>
+  <hr>
+
+  {% if is_changed %}
+    <!-- The changes have been complete -->
+
+    <h4>Данные успешно изменены</h4>
+
+    <p>Ваши данные были изменены.<br>Обновите домашнюю страницу.</p>
+
+  {% else %}
+    <!-- The changes were not executed -->
+
+    <h4>Никакие данные не были изменены</h4>
+
+    <p>Вы не внесли никаких изменений.</p>
+
+    <hr>
+    <a href="{% url 'web:user_update' %}">User Update</a>
+
+  {% endif %}
+
+  <hr>
+{% endblock %}

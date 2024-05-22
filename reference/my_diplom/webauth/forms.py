@@ -1,3 +1,4 @@
+from django import forms
 from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.forms import AuthenticationForm
 from rest_framework.exceptions import ValidationError
@@ -45,3 +46,14 @@ class AppUserCreationForm(AdminCreationUserForm):
     class Meta(AdminCreationUserForm.Meta):
         model = User
         fields = ['email', 'first_name', 'last_name']
+
+
+class AppUserChangeForm(forms.ModelForm):
+    """ Форма для изменения персональных данных пользователя.
+    """
+    company = forms.CharField(label='Компания', required=False, disabled=True)     # Это поле только для просмотра.
+    position = forms.CharField(label='Должность', required=False, disabled=True)   # Это поле только для просмотра.
+
+    class Meta:
+        model = User
+        fields = ['email', 'first_name', 'last_name', 'company', 'position']

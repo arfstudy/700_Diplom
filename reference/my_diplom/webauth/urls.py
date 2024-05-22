@@ -25,6 +25,12 @@ urlpatterns = [
         name='email_verify_confirm',
     ),
     path('register/', views.UserRegisterView.as_view(), name='register'),
+    path(
+        'user_editing/',
+        TemplateView.as_view(template_name='webauth/editing_personal_data.html'),
+        name='user_editing',
+    ),
+    path('user_update/', views.UserUpdateView.as_view(), name='user_update'),
 
     path('inspect/', views.UserInspectView.as_view(), name='inspect'),
 ]
