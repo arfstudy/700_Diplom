@@ -14,7 +14,6 @@ app_name = 'web'
 urlpatterns = [
     path('login/', views.UserLoginView.as_view(), name='login'),
     path('logout/', views.UserLogoutView.as_view(), name='logout'),
-
     path(
         'email_verify/done/',
         TemplateView.as_view(template_name='registration/email_verify_done.html'),
@@ -25,6 +24,7 @@ urlpatterns = [
         views.UserEmailVerifyView.as_view(),
         name='email_verify_confirm',
     ),
+    path('register/', views.UserRegisterView.as_view(), name='register'),
 
     path('inspect/', views.UserInspectView.as_view(), name='inspect'),
 ]

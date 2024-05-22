@@ -10,5 +10,14 @@
     <p>{{ line }}</p>
   {% endfor %}
 
+  {% if not_verify %}
+
+    <hr>
+    {% if is_register %}
+      <a href='{% url "web:register" %}'>Register</a>
+    {% endif %}
+
+  {% endif %}
+
   <hr>
 {% endblock %}

@@ -6,7 +6,7 @@
 
   {% if user.is_authenticated %}
 
-    <!-- Выйти из системы можно только методом "POST". Для этого организована форма. -->
+    <!-- Выходить из системы можно только методом "POST". Для этого организована форма. -->
     <!-- Никакие данные вводить в эту форму не требуется. Нужна только кнопка "Выйти". -->
     <form action="{% url 'web:logout' %}" method="POST">
       {% csrf_token %}
@@ -22,6 +22,9 @@
   {% else %}
 
     <a href="{% url 'web:login' %}">Login</a>
+
+    <span>&nbsp; &nbsp;|&nbsp; &nbsp;</span>    <!-- '&nbsp;','пробел','&nbsp;' -->
+    <a href="{% url 'web:register' %}">Register</a>
 
   {% endif %}
   <hr>

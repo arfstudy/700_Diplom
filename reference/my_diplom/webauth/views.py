@@ -4,7 +4,8 @@ from django.shortcuts import redirect, render
 from django.views import View
 
 from users.emails import send_verify_email
-from webauth.forms import AppAuthenticationForm
+from users.services import get_user
+from webauth.forms import AppAuthenticationForm, AppUserCreationForm
 from webauth.services import verify_received_email
 
 User = get_user_model()
@@ -65,6 +66,40 @@ class UserEmailVerifyView(View):
         data = verify_received_email(request, key64, token)
 
         return render(request, template_name=self.template_verify, context=data)
+
+
+class UserRegisterView(View):
+    """ Класс для создания нового пользователя и регистрации его в системе.
+    """
+    template_name = 'registration/register.html'
+    message_template = 'registration/web_verify_email.html'
+    done_url = 'web:email_verify_done'
+
+    def get(self, request):
+        data = {
+            'form': AppUserCreationForm()
+        }
+        return render(request, template_name=self.template_name, context=data)
+
+    def post(self, request):
+        form = AppUserCreationForm(request.POST)
+        if form.is_valid():
+            form.save()
+            email = form.cleaned_data.get('email')
+
+            # user = authenticate(request, username=username, password=password)
+            # При атрибуте 'is_active = False', пользователь не аутентифицируется.
+            # Поэтому получаем пользователя из базы, по значению 'email'.
+            user = get_user(email)
+
+            send_verify_email(request, user, 'register', self.message_template)
+            return redirect(self.done_url)
+
+        # Если введённые значения не корректны, то возвращаем эти значения.
+        data = {
+            'form': form
+        }
+        return render(request, template_name=self.template_name, context=data)
 
 
 class UserInspectView(View):
