@@ -1,5 +1,6 @@
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.utils.http import urlsafe_base64_decode
 
 User = get_user_model()
@@ -111,3 +112,21 @@ def is_restore_old_user(old_user_fields, user):
         setattr(user, key, old_user_fields[key])
     user.save(update_fields=changed_data)
     return True
+
+
+@transaction.atomic
+def delete_user(user):
+    """ Удаляет пользователя.
+        Находит пользователя 'user' и, якобы, "удаляет" его,
+        задав атрибутам 'is_active' и 'email_verify' значение 'False'.
+        Если пользователь является менеджером магазина, то "увольняется".
+    """
+    if hasattr(user, 'seller'):
+        user.seller = None
+    if hasattr(user, 'buyer'):
+        user.buyer = None
+
+    user.is_active = False
+    user.email_verify = False
+    user.save()
+    return
