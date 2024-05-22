@@ -49,6 +49,9 @@ def verify_received_keys(request, key64, token, actions):
     is_verify = token_generator.check_token(user, token)
     if is_verify:
         update_fields_list = []
+        if data['process'] == 'register':
+            user.is_active = True
+            update_fields_list.append('is_active')
         user.email_verify = True
         update_fields_list.append('email_verify')
         user.save(update_fields=update_fields_list)
@@ -62,12 +65,12 @@ def describe_keys_verify_result(data, is_verify):
     msg1 = ['Ваша электронная почта подтверждена.']
     msg2 = 'Вы успешно вошли в систему.'
     if is_verify:
-        pass
-
+        if data['process'] == 'register':
+            msg2 = 'Вы успешно зарегистрированы.'
     else:
-        if data['process'] in ['login']:
-            msg1 = [('Ссылка для подтверждения почты оказалась недействительной, возможно, потому'
-                     ', что она уже использовалась.')]
+        msg1 = [('Ссылка для подтверждения почты оказалась недействительной, возможно, потому'
+                 ', что она уже использовалась.')]
+        if data['process'] in ['login', 'register']:
             msg2 = 'Попробуйте ещё раз.'
 
     msg1.append(msg2)

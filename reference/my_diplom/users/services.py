@@ -58,3 +58,14 @@ def decoding_key64(request, key_64, actions):
 
     data['user'] = user
     return data, True
+
+
+def delete_tentative_user(user):
+    """ Удаляет временного пользователя.
+    """
+    try:
+        user.delete()
+    except:
+        return False
+
+    return True
