@@ -17,6 +17,12 @@
       <a href='{% url "web:register" %}'>Register</a>
     {% endif %}
 
+    {% if is_update %}
+      {% if is_restore %}
+        <a href="{% url 'web:user_update' %}">User Update</a>
+      {% endif %}
+    {% endif %}
+
   {% endif %}
 
   <hr>

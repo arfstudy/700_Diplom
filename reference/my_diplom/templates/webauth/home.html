@@ -10,8 +10,11 @@
     <!-- Никакие данные вводить в эту форму не требуется. Нужна только кнопка "Выйти". -->
     <form action="{% url 'web:logout' %}" method="POST">
       {% csrf_token %}
-
       <p>
+
+        <a href="{% url 'web:user_editing' %}">Editing Personal Data</a>
+        <!-- Тег <span> применён для вставки четырёх пробелов перед вертикальной чертой. -->
+        <span> &nbsp; &nbsp;|</span>    <!-- 'пробел','&nbsp;','пробел','&nbsp;' -->
 
         <!-- Эту кнопку маскируем под ссылку. -->
         <input type="submit" class="btn btn-link" value="Logout">
