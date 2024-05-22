@@ -1,8 +1,11 @@
-from django.contrib.auth import authenticate
+from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.forms import AuthenticationForm
 from rest_framework.exceptions import ValidationError
 
+from users.forms import AdminCreationUserForm
 from users.services import get_user
+
+User = get_user_model()
 
 
 class AppAuthenticationForm(AuthenticationForm):
@@ -34,3 +37,11 @@ class AppAuthenticationForm(AuthenticationForm):
                 raise self.get_invalid_login_error()
 
         return self.cleaned_data
+
+
+class AppUserCreationForm(AdminCreationUserForm):
+    """ Фома для создания нового пользователя.
+    """
+    class Meta(AdminCreationUserForm.Meta):
+        model = User
+        fields = ['email', 'first_name', 'last_name']
