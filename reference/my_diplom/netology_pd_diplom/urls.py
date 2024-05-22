@@ -29,4 +29,7 @@ urlpatterns = [
     path(
         'webauth/', include(arg='webauth.urls', namespace='web')
     ),
+    path(
+        'api/v1/apiauth/', include(arg='apiauth.urls', namespace='api')
+    ),
 ]
