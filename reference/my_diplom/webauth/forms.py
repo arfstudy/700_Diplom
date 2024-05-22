@@ -57,3 +57,9 @@ class AppUserChangeForm(forms.ModelForm):
     class Meta:
         model = User
         fields = ['email', 'first_name', 'last_name', 'company', 'position']
+
+
+class UserDeleteForm(forms.Form):
+    """ Форма для отображения контрольного текста, подтверждающего намерения пользователя.
+    """
+    verify_text = forms.CharField(label="Контрольный текст")
