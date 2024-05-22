@@ -1,0 +1,33 @@
+{% extends 'webauth/base.html' %}
+
+{% block content %}
+  <h1>Удаление пользователя</h1>
+  <hr>
+
+  <h4>Вы собираетесь удалить Себя</h4>
+
+  <p>Введите этот текст в предоставленное поле: &nbsp;<b>{{ user.email }}</b></p>
+
+  {% if form.errors %}
+    <p>{{ form.errors.errors }}</p>
+  {% endif %}
+
+  <form action="{% url 'web:user_delete_confirm' %}" method="POST">
+    {% csrf_token %}
+    <table>
+      {{ form.as_table }}
+    </table>
+    <p>&nbsp;</p>
+    <p>
+
+      <a href="{% url 'web:user_editing' %}" class="btn btn-warning">Отменить</a>
+      <span>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;</span>    <!-- '&nbsp;' +6 групп ('пробел','&nbsp;') -->
+
+      <!-- <button type="submit" class="btn btn-success">Submit</button> -->   <!-- У автора. -->
+      <input type="submit" class="btn btn-danger" value="Удалить пользователя">
+
+    </p>
+    <hr>
+  </form>
+
+{% endblock %}

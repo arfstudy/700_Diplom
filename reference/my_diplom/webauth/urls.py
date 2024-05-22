@@ -31,6 +31,13 @@ urlpatterns = [
         name='user_editing',
     ),
     path('user_update/', views.UserUpdateView.as_view(), name='user_update'),
+    path('user_delete/',TemplateView.as_view(template_name='webauth/user_delete.html'),name='user_delete',),
+    path('user_delete_confirm/', views.UserDeleteView.as_view(), name='user_delete_confirm',),
+    path(
+        'delete/complete/',
+        TemplateView.as_view(template_name='webauth/user_delete_complete.html'),
+        name='user_delete_complete',
+    ),
 
     path('inspect/', views.UserInspectView.as_view(), name='inspect'),
 ]

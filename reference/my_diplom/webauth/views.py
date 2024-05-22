@@ -1,12 +1,12 @@
-from django.contrib.auth import authenticate, get_user_model, login
+from django.contrib.auth import authenticate, get_user_model, login, logout
 from django.contrib.auth.views import LoginView, LogoutView
 from django.shortcuts import redirect, render
 from django.views import View
-from django.views.generic import UpdateView
+from django.views.generic import UpdateView, DeleteView
 
 from users.emails import send_verify_email
-from users.services import get_user, get_user_fields_dict, save_old_user
-from webauth.forms import AppAuthenticationForm, AppUserCreationForm, AppUserChangeForm
+from users.services import get_user, get_user_fields_dict, save_old_user, delete_user
+from webauth.forms import AppAuthenticationForm, AppUserCreationForm, AppUserChangeForm, UserDeleteForm
 from webauth.services import verify_received_email
 
 User = get_user_model()
@@ -108,7 +108,7 @@ class UserRegisterView(View):
 
 
 class UserUpdateView(UpdateView):
-    """ Контроллер, который изменяет персональные данные пользователя.
+    """ Класс для изменения персональных данных пользователя.
         (instance - "старый" объект, после валидации становится "новым" объектом,
         validated_data - "новые" значения полей объекта.)
     """
@@ -153,6 +153,39 @@ class UserUpdateView(UpdateView):
             return render(request, template_name=self.template_update, context=data)
 
         return render(request, template_name=self.template_complete, context={'is_changed': False})
+
+
+class UserDeleteView(DeleteView):
+    """ Класс для удаления аккаунта пользователя.
+    """
+    template_confirm = 'webauth/user_delete_confirm.html'
+    template_complete = 'webauth/user_delete_complete.html'
+
+    def get(self, request, *args, **kwargs):
+        """ Отображает форму для ввода контрольного текста.
+        """
+        data = {
+            'form': UserDeleteForm(),
+        }
+        return render(request, template_name=self.template_confirm, context=data)
+
+    def post(self, request, *args, **kwargs):
+        """ Получает подтверждение на удаление пользователем самого себя.
+        """
+        form = UserDeleteForm(request.POST)
+        if form.is_valid():
+            is_done = bool(form.cleaned_data.get("verify_text", "") == request.user.email)
+            if is_done:
+                delete_user(request.user)
+                logout(request)
+
+            return render(request, template_name=self.template_complete, context={'is_deleted': is_done})
+
+        # Если введённые значения не корректны, то возвратить эти значения.
+        data = {
+            'form': UserDeleteForm(),
+        }
+        return render(request, template_name=self.template_confirm, context=data)
 
 
 class UserInspectView(View):

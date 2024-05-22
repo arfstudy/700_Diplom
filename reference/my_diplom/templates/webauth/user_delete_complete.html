@@ -1,0 +1,24 @@
+{% extends 'webauth/base.html' %}
+
+{% block content %}
+  <h1>Удаление пользователя</h1>
+  <hr>
+
+  {% if is_deleted %}
+
+    <h4>Пользователь удалён</h4>
+
+    <p>Благодарим вас за время, проведённое на этом сайте.</p>
+
+  {% else %}
+
+    <h4>Ошибка удаления</h4>
+
+    <p>Вы ввели неправильный текст.</p>
+
+    <hr>
+    <a href="{% url 'web:user_delete' %}">User Delete</a>
+
+  {% endif %}
+  <hr>
+{% endblock %}
