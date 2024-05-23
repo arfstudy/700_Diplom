@@ -70,7 +70,7 @@ def complete_user_conversion(data, is_verify):
                 context['user'] = f'{data["user"]}'
             else:
                 context['token_err'] = 'Ошибка. Не удалось получить токен.'
-                context['condition'] = status.HTTP_417_EXPECTATION_FAILED
+                context['condition'] = status.HTTP_400_BAD_REQUEST
     else:
         context[data['process']][0] = 'Ошибка подтверждения почты.'
         context['condition'] = status.HTTP_400_BAD_REQUEST

@@ -102,3 +102,22 @@ class UserLogoutView(APIView):
             return Response(data={'logout': 'Успешный выход из системы.'}, status=status.HTTP_204_NO_CONTENT)
 
         return Response(data={'logout': 'Ошибка удаления токена.'}, status=status.HTTP_417_EXPECTATION_FAILED)
+
+
+class NewTokenCreateView(UserLoginView):
+    """ Класс для обновления токена.
+    """
+
+    def post(self, request):
+        """ Обновляет скомпрометированный токен.
+        """
+        data = self.process_login_parameters(request, 'token')
+        if 'user' not in data.keys():
+            return Response(data=data)
+
+        if hasattr(data['user'], 'auth_token') and data['user'].auth_token is not None:
+            # Удаляет старый токен.
+            delete_token(data['user'])
+
+        token, created = get_or_create_token(user=data['user'])
+        return Response(data={'token': 'Ваш токен успешно обновлён.', 'token_key': token.key})
