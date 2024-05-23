@@ -15,4 +15,5 @@ urlpatterns = [
     path('logout/', views.UserLogoutView.as_view(), name='logout'),
 
     path('verify/', views.EmailVerifyView.as_view(), name='verify'),
+    path('token/', views.CreateNewTokenView.as_view(), name='token'),
 ]
