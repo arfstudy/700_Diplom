@@ -1,3 +1,5 @@
+import re
+
 from rest_framework import status
 
 from apiauth.services import complete_user_conversion, delete_token, get_received_keys
@@ -21,7 +23,7 @@ def validate_required_fields(incoming_data, fields):
     return errors
 
 
-def verify_received_email(request, old_user_values):
+def verify_received_email(request, old_user_values, model_serializer):
     """ Выполняет подтверждение электронной почты на основании ключа и токена,
         полученных от пользователя, и подготавливает соответствующий ответ.
     """
@@ -30,7 +32,7 @@ def verify_received_email(request, old_user_values):
         errors['condition'] = status.HTTP_400_BAD_REQUEST
         return errors
 
-    actions = ['login', 'token']
+    actions = ['login', 'token', 'register']
     data, is_verify = verify_received_keys(request, key64, token, actions)
     if not is_verify:
         # Проверяет, что удалось распознать пользователя и его действие.
@@ -48,7 +50,7 @@ def verify_received_email(request, old_user_values):
 
     data = describe_keys_verify_result(data, is_verify)
 
-    context = complete_user_conversion(data, is_verify)
+    context = complete_user_conversion(data, is_verify, model_serializer)
     if is_reassigned:
         context = {old_process: context[data['process']], **context}
         del context[data['process']]
@@ -56,3 +58,80 @@ def verify_received_email(request, old_user_values):
             context[old_process][1] = 'Ваш токен успешно обновлён.'
 
     return context
+
+
+def is_validate_text(text, pattern):
+    """ Определяет принадлежность символов содержимого поля заданному алфавиту.
+        (После удаления из содержимого поля всех символов заданного алфавита должна остаться пустая строка.)
+    """
+    result = re.sub(pattern=pattern, repl="", string=text, flags=re.IGNORECASE)
+    return bool(result is not None and len(result) == 0)
+
+
+def validate_name(name, alphabets):
+    """ Определяет принадлежность символов содержимого поля к одному из алфавитов.
+    """
+    for alph_key in alphabets.keys():
+        if is_validate_text(text=name, pattern=alphabets[alph_key]):
+            return alph_key
+    return 'None'
+
+
+def validate_names(names, attributes_list, alphabets, user_obj=None):
+    """ Проверяет имена на содержание символов одного и того же алфавита.
+        Если заданы не все поля (при редактировании), то сравнивает ещё
+        с одним полем из Базы Данных.
+    """
+    is_valid, other = True, attributes_list.copy()
+    language_name = language_field = 'None'
+    errors = {'warning': 'В вашем имени и фамилии должны быть только русские или только латинские буквы.'}
+    for field_name in attributes_list:
+        if field_name in names.keys():
+            other.remove(field_name)
+            alph = validate_name(names[field_name], alphabets)
+            if alph != 'None':
+                if language_name == 'None':
+                    language_name, language_field = alph, field_name
+                else:
+                    if alph != language_name:
+                        is_valid = False
+                        errors['validate_names'] = f'Алфавиты полей `{language_field}` и `{field_name}` не совпадают.'
+                        break
+            else:
+                is_valid, errors[field_name] = False, 'Буквы из разных алфавитов или недопустимые символы.'
+
+    if user_obj is not None and is_valid and other:
+        for field in other:
+            alph = validate_name(getattr(user_obj, field, 'ЯZ'), alphabets)
+            if alph != 'None':
+                if alph != language_name:
+                    is_valid = False
+                    errors['validate_names'] = f'Алфавиты полей `{language_field}` и `{field}` не совпадают.'
+            else:
+                is_valid, errors[field] = False, 'Буквы из разных алфавитов или недопустимые символы.'
+            break
+
+    return errors, is_valid
+
+
+def validate_names_fields(attrs, user_obj=None):
+    """ Проверяет имена на содержание символов одного из заданных алфавитов.
+    """
+    alphabets = {                                   # Можно изменить, например добавить ещё какой-нибудь алфавит.
+        'ru_pattern': r'[а-яё ]+',    # Для русского алфавита.
+        'lat_pattern': r'[a-z ]+',    # Для латинского алфавита.
+    }
+    attributes_list = ['first_name', 'last_name']    # Можно изменить, например добавить ещё 'sur_name'.
+    for field in attributes_list:
+        if field in attrs.keys():
+
+            errors, is_valid = validate_names(attrs, attributes_list, alphabets, user_obj)
+
+            if is_valid:
+                for attribute in attributes_list:
+                    if attribute in attrs.keys():
+                        attrs[attribute] = attrs[attribute].title()
+
+            return attrs, is_valid, errors
+
+    return attrs, True, {'warning': 'Нет полей для проверки.'}

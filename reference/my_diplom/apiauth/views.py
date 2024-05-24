@@ -1,10 +1,12 @@
 from django.contrib.auth import authenticate
+from django.contrib.auth.password_validation import validate_password
 from rest_framework import status
 from rest_framework.exceptions import NotFound, AuthenticationFailed, ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apiauth.services import get_or_create_token, delete_token
+from apiauth.serializers import UserSerializer
+from apiauth.services import get_or_create_token, delete_token, save_password
 from apiauth.validators import validate_required_fields, verify_received_email
 from users.emails import send_verify_email
 from users.services import get_user
@@ -84,7 +86,7 @@ class EmailVerifyView(APIView):
         if errors:
             raise ValidationError({'detail': errors})
 
-        data = verify_received_email(request, OLD_VALUES)
+        data = verify_received_email(request, OLD_VALUES, UserSerializer)
 
         condition = data.pop('condition', status.HTTP_200_OK)
         return Response(data=data, status=condition)
@@ -121,3 +123,47 @@ class NewTokenCreateView(UserLoginView):
 
         token, created = get_or_create_token(user=data['user'])
         return Response(data={'token': 'Ваш токен успешно обновлён.', 'token_key': token.key})
+
+
+class UserRegisterView(APIView):
+    """ Класс для создания нового пользователя.
+    """
+    message_template = 'registration/api_email_verify.html'
+
+    def post(self, request):
+        """ Создаёт нового пользователя.
+        """
+        # Проверяем обязательные аргументы.
+        required_fields = {'first_name', 'last_name', 'email', 'password1', 'password2'}
+        errors = validate_required_fields(request.data, required_fields)
+        if errors:
+            raise ValidationError({'detail': errors})
+
+        if request.data['password1'] != request.data['password2']:
+            raise ValidationError({'detail': 'Пароли не совпадают.'})
+
+        try:    #    Проверяем пароль на сложность.
+            validate_password(request.data['password1'])
+        except Exception as password_error:
+            error_array = []
+            # Noinspection PyTypeChecker
+            for item in password_error:
+                error_array.append(item)
+            raise ValidationError({'password_err': error_array})
+
+        # Проверяем данные для уникальности имени пользователя
+        request.data._mutable = True
+        request.data.update({})
+        user_serializer = UserSerializer(data=request.data)
+        if user_serializer.is_valid(raise_exception=True):
+            # Сохраняем пользователя
+            tentative_user = user_serializer.save()
+            save_password(tentative_user, request.data['password1'])
+
+            send_verify_email(request, tentative_user, 'register', self.message_template)
+            return Response(data={
+                'register': 'Требуется дополнительное действие.',
+                'email': 'Необходимо подтвердить электронную почту. Мы отправили Вам письмо с инструкциями.',
+            })
+
+        raise ValidationError({'errors': user_serializer.errors})
