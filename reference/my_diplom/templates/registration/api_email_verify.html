@@ -1,0 +1,9 @@
+{% autoescape off %}
+
+Добрый день, {{ user.get_username }}.
+
+Пожалуйста, отправьте ключ и токен, чтобы завершить подтверждение почты:
+Key64 {{ key64 }}
+Token {{ token }}
+
+{% endautoescape %}

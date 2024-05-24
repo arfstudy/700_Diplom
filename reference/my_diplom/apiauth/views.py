@@ -1,10 +1,12 @@
 from django.contrib.auth import authenticate
+from rest_framework import status
 from rest_framework.exceptions import NotFound, AuthenticationFailed, ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apiauth.services import get_or_create_token
+from apiauth.services import get_or_create_token, verify_received_email
 from apiauth.validators import validate_incoming_fields
+from users.emails import send_verify_email
 from users.services import get_user
 
 OLD_VALUES = {}
@@ -45,6 +47,10 @@ class UserLoginView(APIView):
             )
 
         # Если электронная почта неподтверждённая, то отправляет письмо пользователю.
+        if not user.email_verify:
+            send_verify_email(request, tentative_user, process, self.message_template)
+            return {process: 'Требуется дополнительное действие.',
+                    'email': 'Необходимо подтвердить электронную почту. Мы отправили Вам письмо с инструкциями.'}
 
         return {'user': user}
 
@@ -61,4 +67,24 @@ class UserLoginView(APIView):
             content['login'] = 'Вы уже находитесь в системе.'
 
         token, created = get_or_create_token(user=data['user'])
-        return Response(data={**content, 'token_key': token.key, 'user': f'{data['user']}'})
+        return Response(data={**content, 'token_key': token.key, 'user': f'{data["user"]}'})
+
+
+class EmailVerifyView(APIView):
+    """ Класс для подтверждения email.
+    """
+
+    def post(self, request, *args, **kwargs):
+        """ Проверяет корректность ключей, полученных от пользователя.
+        """
+        global OLD_VALUES
+        # Проверяем обязательные аргументы.
+        required_fields = {'key64', 'token'}
+        res, is_incoming = validate_incoming_fields(request.data, required_fields)
+        if not is_incoming:
+            raise ValidationError({'detail': res})
+
+        data = verify_received_email(request, OLD_VALUES)
+
+        condition = data.pop('condition', status.HTTP_200_OK)
+        return Response(data=data, status=condition)
