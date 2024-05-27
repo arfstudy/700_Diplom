@@ -1,4 +1,4 @@
-from django.contrib.auth import authenticate
+from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.password_validation import validate_password
 from rest_framework import status
 from rest_framework.exceptions import NotFound, AuthenticationFailed, ValidationError
@@ -7,10 +7,11 @@ from rest_framework.views import APIView
 
 from apiauth.serializers import UserSerializer
 from apiauth.services import get_or_create_token, delete_token, save_password
-from apiauth.validators import validate_incoming_fields, verify_received_email
+from apiauth.validators import validate_incoming_fields, verify_received_email, comparison_incoming_data
 from users.emails import send_verify_email
-from users.services import get_user
+from users.services import get_user, save_old_user as retain_old_values_user
 
+User = get_user_model()
 OLD_VALUES = {}
 
 
@@ -180,3 +181,69 @@ class LookUserView(APIView):
             raise ValidationError({'detail': 'Недопустимый токен.'})
 
         return Response(data={'user': UserSerializer(instance=look_user).data}, status=status.HTTP_200_OK)
+
+
+class UserUpdateView(APIView):
+    """ Класс для изменения персональных данных пользователя.
+    """
+    email_message_template = 'registration/api_email_verify.html'
+    writable_fields = ['email', 'first_name', 'last_name']
+
+    def put(self, request, *args, **kwargs):
+        """ Изменяет все поля пользователя.
+        """
+        put_msg = {'put': 'Или воспользуйтесь PATCH-запросом.'}
+        content = self.update_user(request, self.writable_fields, put_msg)
+        return Response(data=content, status=status.HTTP_200_OK)
+
+    def patch(self, request, *args, **kwargs):
+        """ Изменяет переданные поля пользователя.
+        """
+        # Проверяем на присутствие хотя бы одного переданного поля.
+        changed_list = [k for k in request.data.keys() if k in self.writable_fields]
+        if not changed_list:
+            raise ValidationError({'detail': 'Вы не передали ни одного поля для изменений.',
+                                   'patch': f'Допустимые поля: `{"` `".join(self.writable_fields)}`.'})
+
+        content = self.update_user(request, changed_list, {})
+        return Response(data=content, status=status.HTTP_200_OK)
+
+    def update_user(self, request, changed_list, put_msg):
+        """ Изменяет пользователя.
+        """
+        global OLD_VALUES
+        # Проверяем наличие аргументов.
+        res, is_incoming = validate_incoming_fields(request.data, changed_list)
+        if not is_incoming:
+            data = {'detail': res}
+            if put_msg:
+                data = {**data, **put_msg}
+            raise ValidationError(detail=data)
+
+        # Проверяем переданные поля на совпадение со значениями из БД.
+        res, warning = comparison_incoming_data(request.data, self.writable_fields, request.user)
+        if 'warning' in warning.keys():
+            warning_msg = {'warning': warning.pop('warning'), 'contact': UserSerializer(instance=request.data).data}
+            raise ValidationError(detail={**warning_msg, **warning})
+
+        changed_list = [k for k in res.keys()]
+        OLD_VALUES = retain_old_values_user(request.user, changed_list)
+        user_serializer = UserSerializer(instance=request.user, data=res, partial=True)
+        if user_serializer.is_valid(raise_exception=True):
+            # сохраняем пользователя
+            user = user_serializer.save()
+            if 'email' in changed_list:
+                user.email_verify = False
+                user.save(update_fields=['email_verify'])
+
+                send_verify_email(request, user, 'update', self.email_message_template)
+                email_msg = {
+                    'update': 'Требуется дополнительное действие.',
+                    'email': 'Необходимо подтвердить электронную почту. Мы отправили Вам письмо с инструкциями.'
+                }
+                return {**email_msg, **warning} if warning else email_msg
+
+            update_msg = {'update': 'Ваши данные успешно изменены.', 'user': UserSerializer(instance=user).data}
+            return {**update_msg, **warning} if warning else update_msg
+
+        raise ValidationError({'detail': user_serializer.errors})

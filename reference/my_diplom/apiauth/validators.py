@@ -2,8 +2,9 @@ import re
 
 from rest_framework import status
 
-from apiauth.services import complete_user_conversion, delete_token, get_received_keys
+from apiauth.services import complete_user_conversion, delete_token, get_received_keys, get_choice_fields
 from users.emails import describe_keys_verify_result, verify_received_keys
+from users.services import is_restore_old_user
 
 
 def validate_incoming_fields(incoming_data, fields):
@@ -36,14 +37,24 @@ def verify_received_email(request, old_user_values, model_serializer):
         errors['condition'] = status.HTTP_400_BAD_REQUEST
         return errors
 
-    actions = ['login', 'token', 'register']
+    actions = ['login', 'token', 'register', 'update']
     data, is_verify = verify_received_keys(request, key64, token, actions)
+    is_restore = True
     if not is_verify:
         # Проверяет, что удалось распознать пользователя и его действие.
         context = {key: data[key] for key in ['process_err', 'user_err'] if key in data.keys()}
         if context:
             context['condition'] = status.HTTP_400_BAD_REQUEST
             return context
+
+        # Восстанавливает старые значения пользователя, если, при редактировании, почта не подтвердилась.
+        if data['process'] == 'update' and 'user' in data.keys():
+            is_restore = is_restore_old_user(old_user_values, data['user'])
+            if is_restore:
+                data['user'].email_verify = True
+                data['user'].save(update_fields='email_verify')
+    old_user_values.clear()
+    data['is_restore'] = is_restore
 
     is_reassigned, old_process = False, ''
     if data['process'] == 'token':
@@ -139,3 +150,30 @@ def validate_names_fields(attrs, user_obj=None):
             return attrs, is_valid, errors
 
     return attrs, True, {'warning': 'Нет полей для проверки.'}
+
+
+def comparison_incoming_data(data, can_change_fields, obj):
+    """ Проверяет на совпадение переданных значений со значениями из БД.
+        (Удаляет из копии полученных данных 'data' те поля, значения в которых совпадают
+        со значениями из объекта 'obj', и те, которые отсутствуют у объекта 'obj'.
+        Останутся только те поля, которые, действительно, несут какие-то изменения.)
+    """
+    choice_fields = get_choice_fields(obj)
+    attr = data.copy()
+    ignored = dict()
+    for field in data.keys():
+        if hasattr(obj, field):
+            if field in can_change_fields:
+                if field not in choice_fields:
+                    if attr[field] == getattr(obj, field):
+                        del attr[field]
+            else:
+                ignored[field] = 'Это поле не подлежит изменению.'
+                del attr[field]
+        else:
+            ignored[field] = 'Неизвестное поле. Проигнорировано.'
+            del attr[field]
+
+    warning = {} if attr else {'warning': 'Вы не передали ничего нового.'}
+    warning = {**warning, **ignored}
+    return attr, warning

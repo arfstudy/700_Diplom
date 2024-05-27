@@ -90,6 +90,8 @@ def complete_user_conversion(data, is_verify, model_serializer):
             else:
                 context['token_err'] = 'Ошибка. Не удалось получить токен.'
                 context['condition'] = status.HTTP_400_BAD_REQUEST
+        elif data['process'] == 'update':
+            context['user'] = model_serializer(instance=data["user"]).data
     else:
         context[data['process']][0] = 'Ошибка подтверждения почты.'
         context['condition'] = status.HTTP_400_BAD_REQUEST
@@ -99,3 +101,16 @@ def complete_user_conversion(data, is_verify, model_serializer):
                 context['register_err'] = 'Ошибка. Информация о временном пользователе осталась в Базе Данных.'
 
     return context
+
+
+def get_choice_fields(obj):
+    """ Находит поля перечисляемого типа в модели объекта 'obj'.
+    """
+    choice_fields = []
+    obj_parent = obj.__class__
+    for field in obj.__dict__:
+        if hasattr(obj_parent, field):
+            if getattr(obj_parent, field).field.choices is not None:
+                choice_fields.append(field)
+
+    return choice_fields
