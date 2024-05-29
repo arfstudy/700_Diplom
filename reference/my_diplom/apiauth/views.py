@@ -9,7 +9,7 @@ from apiauth.serializers import UserSerializer
 from apiauth.services import get_or_create_token, delete_token, save_password
 from apiauth.validators import validate_incoming_fields, verify_received_email, comparison_incoming_data
 from users.emails import send_verify_email
-from users.services import get_user, save_old_user as retain_old_values_user
+from users.services import get_user, save_old_user as retain_old_values_user, delete_user
 
 User = get_user_model()
 OLD_VALUES = {}
@@ -247,3 +247,24 @@ class UserUpdateView(APIView):
             return {**update_msg, **warning} if warning else update_msg
 
         raise ValidationError({'detail': user_serializer.errors})
+
+
+class UserDeleteView(APIView):
+    """ Класс для удаления пользователя.
+    """
+
+    def delete(self, request, *args, **kwargs):
+        """ Удаляет пользователя.
+            Реально, меняется флаг доступности 'is_active' на False.
+        """
+        deleted_user = request.user
+        if deleted_user is None:
+            raise ValidationError({'detail': 'Недопустимый токен.'})
+
+        delete_user(deleted_user)
+        if hasattr(deleted_user, 'auth_token') and deleted_user.auth_token is not None:
+            # Удаляет токен.
+            delete_token(deleted_user)
+
+        return Response(data={'delete': f'Пользователь `{deleted_user}` удалён.'},
+                        status=status.HTTP_204_NO_CONTENT)
