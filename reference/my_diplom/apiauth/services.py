@@ -1,13 +1,22 @@
 from rest_framework import status
 from rest_framework.authtoken.models import Token
 
-from users.emails import verify_received_keys, describe_keys_verify_result
-
 
 def get_or_create_token(user):
     """ Возвращает токен пользователя или создаёт, если его нет.
     """
     return Token.objects.get_or_create(user=user)    # (token, created)
+
+
+def delete_token(user):
+    """ Удаляет токен.
+    """
+    try:
+        user.auth_token.delete()
+    except TypeError:
+        return False
+
+    return True
 
 
 def get_token_key(request, key_name):
@@ -67,26 +76,3 @@ def complete_user_conversion(data, is_verify):
         context['condition'] = status.HTTP_400_BAD_REQUEST
 
     return context
-
-
-def verify_received_email(request, old_user_values):
-    """ Выполняет подтверждение электронной почты на основании ключа и токена,
-        полученных от пользователя, и подготавливает соответствующий ответ.
-    """
-    key64, token, errors = get_received_keys(request)
-    if errors:
-        errors['condition'] = status.HTTP_400_BAD_REQUEST
-        return errors
-
-    actions = ['login']
-    data, is_verify = verify_received_keys(request, key64, token, actions)
-    if not is_verify:
-        # Проверяет, что удалось распознать пользователя и его действие.
-        context = {key: data[key] for key in ['process_err', 'user_err'] if key in data.keys()}
-        if context:
-            context['condition'] = status.HTTP_400_BAD_REQUEST
-            return context
-
-    data = describe_keys_verify_result(data, is_verify)
-
-    return complete_user_conversion(data, is_verify)
