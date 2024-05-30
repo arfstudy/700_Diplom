@@ -4,8 +4,8 @@ from rest_framework.exceptions import NotFound, AuthenticationFailed, Validation
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apiauth.services import get_or_create_token, verify_received_email
-from apiauth.validators import validate_incoming_fields
+from apiauth.services import get_or_create_token, delete_token
+from apiauth.validators import validate_incoming_fields, verify_received_email
 from users.emails import send_verify_email
 from users.services import get_user
 
@@ -88,3 +88,16 @@ class EmailVerifyView(APIView):
 
         condition = data.pop('condition', status.HTTP_200_OK)
         return Response(data=data, status=condition)
+
+
+class UserLogoutView(APIView):
+    """ Класс для выполнения выхода из системы.
+    """
+
+    def post(self, request, *args, **kwargs):
+        """ Удаляет токен.
+        """
+        if delete_token(request.user):
+            return Response(data={'logout': 'Успешный выход из системы.'}, status=status.HTTP_204_NO_CONTENT)
+
+        return Response(data={'logout': 'Ошибка удаления токена.'}, status=status.HTTP_417_EXPECTATION_FAILED)
