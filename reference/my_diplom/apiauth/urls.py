@@ -23,4 +23,5 @@ urlpatterns = [
     path('delete/', views.UserDeleteView.as_view(), name='delete'),
 
     path("password_reset/", views.PasswordResetAPIView.as_view(), name="password_reset"),
+    path("reset/", views.PasswordResetCompleteAPIView.as_view(), name="reset"),
 ]

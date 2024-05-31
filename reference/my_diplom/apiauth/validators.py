@@ -3,7 +3,7 @@ import re
 from rest_framework import status
 
 from apiauth.services import (complete_user_conversion, delete_token, get_received_keys, exclude_invalid_fields,
-                              get_choice_fields, check_not_null_and_convert, change_residue)
+                              get_choice_fields, check_not_null_and_convert, change_residue, save_password)
 from users.emails import describe_keys_verify_result, verify_received_keys
 from users.services import is_restore_old_user
 
@@ -227,3 +227,28 @@ def pre_check_incoming_fields(data, required_fields, additional_fields, action, 
 
     warning = {'warning': fields_content} if fields_content else {}
     return res, errors, choice_errors, warning, {**put_msg, **invalid_fields}
+
+
+def verify_password_reset_keys(request):
+    """ Выполняет проверку полученного ключа и токена и присваивает новый пароль.
+    """
+    key64, token, errors = get_received_keys(request)
+    if errors:
+        errors['condition'] = status.HTTP_400_BAD_REQUEST
+        return errors
+
+    actions = ['reset']
+    data, is_verify = verify_received_keys(request, key64, token, actions)
+    if is_verify:
+        save_password(data['user'], request.data['password1'])
+        context = {'reset': ['Ваш пароль сохранён.', 'Теперь вы можете войти.'], 'condition': status.HTTP_200_OK}
+        delete_token(data['user'])
+
+    else:
+        # Определяет, что не удалось распознать пользователя и его действие (ключ Key64) или токен (ключ Token).
+        context = {key: data[key] for key in ['process_err', 'user_err'] if key in data.keys()}
+        if not context:
+            context = {'reset': ['Ошибка подтверждения ключей.', 'Попробуйте ещё раз.']}
+        context['condition'] = status.HTTP_400_BAD_REQUEST
+
+    return context
