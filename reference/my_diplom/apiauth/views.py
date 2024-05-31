@@ -260,3 +260,34 @@ class UserDeleteView(APIView):
 
         return Response(data={'delete': f'Пользователь `{deleted_user}` удалён.'},
                         status=status.HTTP_204_NO_CONTENT)
+
+
+class PasswordResetAPIView(APIView):
+    """ Класс для начала сброса скомпрометированного или забытого пароля (восстановления пароля).
+    """
+    message_template = 'registration/api_email_verify.html'
+
+    def post(self, request):
+        """ Проверяет адрес электронной почты пользователя и отправляет письмо с ключом
+            и токеном для сброса пароля.
+        """
+        # Проверяем обязательные аргументы.
+        required_fields = {'email'}
+        errors = validate_required_fields(request.data, required_fields)
+        if errors:
+            raise ValidationError({'detail': errors})
+
+        email = request.data.get('email')
+        tentative_user = get_user(email)
+        if not (tentative_user is not None and tentative_user.email_verify):
+            # User matching query does not exist.
+            raise NotFound('Пользователь с такой электронной почтой не найден.')
+
+        if not tentative_user.is_active:
+            # This user has been deleted. Contact the site administrator.
+            raise NotFound('Этот пользователь был удалён. Обратитесь к администратору сайта.')
+
+        send_verify_email(request, tentative_user, 'reset', self.message_template)
+
+        return Response(data={'reset': ['Мы отправили Вам письмо с ключами для установки нового пароля.',
+                'Пожалуйста, укажите новый пароль дважды.']})
