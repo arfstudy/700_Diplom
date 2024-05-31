@@ -6,7 +6,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apiauth.serializers import UserSerializer
-from apiauth.services import get_or_create_token, delete_token, save_password
+from apiauth.services import get_or_create_token, delete_token, save_password, verify_password_reset_keys
 from apiauth.validators import validate_incoming_fields, verify_received_email, comparison_incoming_data
 from users.emails import send_verify_email
 from users.services import get_user, save_old_user as retain_old_values_user, delete_user
@@ -299,3 +299,34 @@ class PasswordResetAPIView(APIView):
 
         return Response(data={'reset': ['Мы отправили Вам письмо с ключами для установки нового пароля.',
                 'Пожалуйста, укажите новый пароль дважды.']})
+
+
+class PasswordResetCompleteAPIView(APIView):
+    """ Класс для завершения сброса скомпрометированного или забытого пароля (восстановления пароля).
+    """
+
+    def post(self, request, *args, **kwargs):
+        """ Проверяет полученные ключи и новый пароль и завершает процесс.
+        """
+        # Проверяем обязательные аргументы.
+        required_fields = {'key64', 'token', 'password1', 'password2'}
+        res, is_incoming = validate_incoming_fields(request.data, required_fields)
+        if not is_incoming:
+            raise ValidationError({'detail': res})
+
+        if request.data['password1'] != request.data['password2']:
+            raise ValidationError({'detail': 'Пароли не совпадают.'})
+
+        try:    #    Проверяем пароль на сложность.
+            validate_password(request.data['password1'])
+        except Exception as password_error:
+            error_array = []
+            # Noinspection PyTypeChecker
+            for item in password_error:
+                error_array.append(item)
+            raise ValidationError({'password_err': error_array})
+
+        data = verify_password_reset_keys(request)
+
+        condition = data.pop('condition', status.HTTP_200_OK)
+        return Response(data=data, status=condition)
