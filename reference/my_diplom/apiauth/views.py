@@ -298,11 +298,11 @@ class PasswordResetCompleteAPIView(APIView):
     """ Класс для завершения сброса скомпрометированного или забытого пароля (восстановления пароля).
     """
 
-    def post(self, request):
-        """ Проверяет полученные ключи и новый пароль и завершает процесс.
+    @staticmethod
+    def validate_incoming_password(request, required_fields):
+        """ Проверяет обязательные аргументы и полученный пароль.
         """
         # Проверяем обязательные аргументы.
-        required_fields = {'key64', 'token', 'password1', 'password2'}
         errors = validate_required_fields(request.data, required_fields)
         if errors:
             raise ValidationError({'detail': errors})
@@ -319,7 +319,32 @@ class PasswordResetCompleteAPIView(APIView):
                 error_array.append(item)
             raise ValidationError({'password_err': error_array})
 
+    def post(self, request):
+        """ Проверяет полученные ключи и новый пароль и завершает процесс.
+        """
+        # Обязательные аргументы.
+        required_fields = {'key64', 'token', 'password1', 'password2'}
+        self.validate_incoming_password(request, required_fields)
+
         data = verify_password_reset_keys(request)
 
         condition = data.pop('condition', status.HTTP_200_OK)
         return Response(data=data, status=condition)
+
+
+class PasswordChangeCompleteAPIView(PasswordResetCompleteAPIView):
+    """ Класс для замены пароля (изменения пароля).
+    """
+
+    def post(self, request, *args, **kwargs):
+        """ Проверяет старый и новый пароли и завершает процесс.
+        """
+        # Обязательные аргументы.
+        required_fields = {'old_password', 'password1', 'password2'}
+        self.validate_incoming_password(request, required_fields)
+
+        is_save = save_password(request.user, request.data['password1'])
+        if not is_save:
+            raise ValidationError({'change_error': 'Ошибка сохранения пароля.'})
+
+        return Response(data={'password_change': 'Ваш новый пароль сохранён.'}, status=status.HTTP_200_OK)
