@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     'users',
     'webauth',
     'apiauth',
+    'backend',
 ]
 
 MIDDLEWARE = [
