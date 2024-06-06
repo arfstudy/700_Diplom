@@ -13,7 +13,9 @@ app_name = 'backend'
 
 router = DefaultRouter()
 router.register(prefix='contact', viewset=views.ContactModelView, basename='contact')
+router.register(prefix=r'short_contacts', viewset=views.ContactsListView, basename='short_contacts')
 
 urlpatterns = [
     # Работает с контактом пользователя.                http://127.0.0.1:8000/api/v1/backend/contact/
+    # Показывает контакты в сокращённом виде.           http://127.0.0.1:8000/api/v1/backend/short_contacts/
 ] + router.urls

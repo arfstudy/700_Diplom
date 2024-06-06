@@ -1,3 +1,4 @@
+from django.contrib.auth import get_user_model
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
@@ -6,6 +7,8 @@ from backend.forms import ContactHasDiffForm
 from backend import models
 from backend.services import get_transmitted_obj
 from backend.validators import to_internal_value_after_pre_check
+
+Salesman = get_user_model()
 
 
 class ContactSerializer(serializers.ModelSerializer):
@@ -42,3 +45,23 @@ class ContactSerializer(serializers.ModelSerializer):
             raise ValidationError(detail={**errors, **invalid_fields})
 
         return ret
+
+
+class ShortSalesmanSerializer(serializers.ModelSerializer):
+    """ Сериализатор для отображения продавца в сокращённом формате.
+    """
+    salesman = serializers.CharField(source='__str__', read_only=True)
+
+    class Meta:
+        model = Salesman
+        fields = ['salesman']
+
+
+class ShortContactSerializer(serializers.ModelSerializer):
+    """ Сериализатор для отображения контакта в сокращённом формате.
+    """
+    contact = serializers.CharField(source='get_short_contact', read_only=True)
+
+    class Meta:
+        model = models.Contact
+        fields = ['contact']
