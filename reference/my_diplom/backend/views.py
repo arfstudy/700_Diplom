@@ -47,3 +47,10 @@ class ContactsListView(viewsets.GenericViewSet):
             return Response(data=salesmans_list, status=status.HTTP_200_OK)
 
         raise NotFound('Page not found.')
+
+
+class ShopView(viewsets.ModelViewSet):
+    """ Класс для работы с моделью магазина.
+    """
+    queryset = models.Shop.objects.all()
+    serializer_class = serializers.ShopSerializer

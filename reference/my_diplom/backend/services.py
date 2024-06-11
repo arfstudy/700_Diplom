@@ -1,6 +1,7 @@
-from rest_framework.exceptions import NotFound
+from django.db.models import Q
+from rest_framework.exceptions import NotFound, ValidationError
 
-from backend.models import Contact
+from backend.models import Contact, Shop
 
 
 def get_contacts(user, pk=0):
@@ -38,3 +39,41 @@ def get_salesman_contacts(salesman, serializers_modul):
     contacts_serializer = serializers_modul.ShortContactSerializer(instance=contacts, many=True)
     return {'salesman': salesman_serializer.data['salesman'],
             'contacts': [e[k] for e in contacts_serializer.data for k in e.keys()]}
+
+
+def join_choice_errors(errors, choice_errors):
+    """ Объединяет тексты ошибок Choice-полей.
+    """
+    for key in choice_errors.keys():
+        if key in errors.keys():
+            errors[key] += choice_errors[key]
+        else:
+            errors[key] = choice_errors[key]
+
+    return
+
+
+def replace_salesmans_errors(errors, res):
+    """ Заменяет тексты ошибок продавцов.
+    """
+    for field in ['seller', 'buyer']:
+        if field in errors.keys():
+            if errors[field][0].startswith('Магазин с таким ') and errors[field][0].endswith(' уже существует.'):
+                errors[field] = [f'Пользователь с id={res[field]} уже является менеджером одного из магазинов.']
+
+            if errors[field][0].startswith('Недопустимый пер') and errors[field][0].endswith('т не существует.'):
+                errors[field] = [f'Пользователь с id={res[field]} не найден.']
+    return
+
+
+def is_not_salesman(obj_ser, salesman):
+    """ Проверяет, что пользователь активен и не является менеджером какого-нибудь магазина.
+    """
+    if salesman:
+        if not salesman.is_active:
+            raise ValidationError(f'Пользователь с id={salesman.id} был удалён. Обратитесь к администратору сайта.')
+
+        if bool(salesman and Shop.objects.filter(Q(buyer=salesman) | Q(seller=salesman)).exists()):
+            raise ValidationError(f'Пользователь с id={salesman.id} уже является менеджером одного из магазинов.')
+
+    return salesman
