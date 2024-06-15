@@ -5,6 +5,7 @@ from rest_framework.exceptions import NotFound, MethodNotAllowed
 from rest_framework.response import Response
 
 from backend import models, serializers
+from backend.permissions import ShopPermissions
 from backend.services import get_contacts, get_salesman_contacts, get_list_shops
 
 Salesman = get_user_model()
@@ -54,6 +55,7 @@ class ShopView(viewsets.ModelViewSet):
     """
     queryset = models.Shop.objects.all()
     serializer_class = serializers.ShopSerializer
+    permission_classes = [ShopPermissions]
 
     def list(self, request, *args, **kwargs):
         """ Возвращает список магазинов в сокращённом виде.

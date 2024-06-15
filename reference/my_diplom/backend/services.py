@@ -1,7 +1,10 @@
+from django.contrib.auth import get_user_model
 from django.db.models import Q
 from rest_framework.exceptions import NotFound, ValidationError
 
 from backend.models import Contact, Shop
+
+Salesman = get_user_model()
 
 
 def get_contacts(user, pk=0):
@@ -73,7 +76,7 @@ def is_not_salesman(obj_ser, salesman):
         if not salesman.is_active:
             raise ValidationError(f'Пользователь с id={salesman.id} был удалён. Обратитесь к администратору сайта.')
 
-        msg = f'Пользователь с id={salesman.id} уже является менеджером одного из магазинов.'
+        msg = f'Пользователь с id={salesman.id} уже является Менеджером одного из магазинов.'
         if obj_ser.context['view'].action == 'create':
             if bool(salesman and Shop.objects.filter(Q(buyer=salesman) | Q(seller=salesman)).exists()):
                 raise ValidationError(msg)

@@ -6,7 +6,7 @@ from apiauth.validators import pre_check_incoming_fields
 from backend import models
 from backend.forms import ContactHasDiffForm, ShopHasDiffForm
 from backend.services import get_transmitted_obj, join_choice_errors, replace_salesmans_errors, is_not_salesman
-from backend.validators import to_internal_value_after_pre_check
+from backend.validators import to_internal_value_after_pre_check, is_permission_updated
 
 Salesman = get_user_model()
 
@@ -138,3 +138,11 @@ class ShopSerializer(serializers.ModelSerializer):
         is_not_salesman(self, value)
 
         return value
+
+    def validate(self, attrs):
+        """ Проверяет все поля на возможность быть изменёнными.
+        """
+        if self.context['view'].action == 'partial_update':
+            is_permission_updated(self, attrs)
+
+        return attrs
