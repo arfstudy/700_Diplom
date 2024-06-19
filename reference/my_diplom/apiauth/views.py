@@ -166,3 +166,17 @@ class UserRegisterView(APIView):
             })
 
         raise ValidationError({'errors': user_serializer.errors})
+
+
+class LookUserView(APIView):
+    """ Класс для отображения пользователя.
+    """
+
+    def get(self, request):
+        """ Выводит данные обратившегося пользователя.
+        """
+        look_user = request.user
+        if look_user is None:
+            raise ValidationError({'detail': 'Недопустимый токен.'})
+
+        return Response(data={'user': UserSerializer(instance=look_user).data}, status=status.HTTP_200_OK)
