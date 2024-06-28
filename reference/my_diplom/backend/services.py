@@ -73,8 +73,14 @@ def is_not_salesman(obj_ser, salesman):
         if not salesman.is_active:
             raise ValidationError(f'Пользователь с id={salesman.id} был удалён. Обратитесь к администратору сайта.')
 
-        if bool(salesman and Shop.objects.filter(Q(buyer=salesman) | Q(seller=salesman)).exists()):
-            raise ValidationError(f'Пользователь с id={salesman.id} уже является менеджером одного из магазинов.')
+        msg = f'Пользователь с id={salesman.id} уже является менеджером одного из магазинов.'
+        if obj_ser.context['view'].action == 'create':
+            if bool(salesman and Shop.objects.filter(Q(buyer=salesman) | Q(seller=salesman)).exists()):
+                raise ValidationError(msg)
+
+        elif obj_ser.context['view'].action in ['update', 'partial_update']:
+            if Shop.objects.exclude(id=obj_ser.instance.id).filter(Q(buyer=salesman) | Q(seller=salesman)).exists():
+                raise ValidationError(msg)
 
     return salesman
 

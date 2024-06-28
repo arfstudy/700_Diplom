@@ -1,7 +1,7 @@
 from django.contrib.auth import get_user_model
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
-from rest_framework.exceptions import NotFound
+from rest_framework.exceptions import NotFound, MethodNotAllowed
 from rest_framework.response import Response
 
 from backend import models, serializers
@@ -59,3 +59,17 @@ class ShopView(viewsets.ModelViewSet):
         """ Возвращает список магазинов в сокращённом виде.
         """
         return Response(data=get_list_shops(self, serializers), status=status.HTTP_200_OK)
+
+    def destroy(self, request, *args, **kwargs):
+        """ Удаляет магазин.
+        """
+        pk = kwargs.get('pk', None)
+        if not pk:
+            raise MethodNotAllowed('Удаление не возможно.')
+        try:
+            shop = models.Shop.objects.get(pk=pk)
+        except:
+            raise NotFound(f'Магазин с id={pk} не найден.')
+
+        shop.delete()
+        return Response(data={'detail': f'Магазин с id={pk} удалён.'}, status=status.HTTP_204_NO_CONTENT)
