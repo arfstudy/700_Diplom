@@ -1,0 +1,28 @@
+{% extends 'webauth/base.html' %}
+
+{% block content %}
+  <h1>Register</h1>
+  <hr>
+
+  {% if form.errors %}
+    <p>{{ form.errors.errors }}</p>
+  {% endif %}
+
+  <form action="{% url 'web:register' %}" method="POST">
+    {% csrf_token %}
+    <table>
+      {{ form.as_table }}
+    </table>
+    <p>&nbsp;</p>
+    <p>
+
+      <a href="{% url 'home' %}" class="btn btn-outline-warning">Отменить</a>
+      <span>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;</span>    <!-- '&nbsp;' +6 групп ('пробел','&nbsp;') -->
+
+      <input type="submit" class="btn btn-outline-success" value="Отправить">
+
+    </p>
+    <hr>
+  </form>
+
+{% endblock %}

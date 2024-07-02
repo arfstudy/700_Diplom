@@ -1,0 +1,15 @@
+{% extends 'webauth/base.html' %}
+
+{% block content %}
+  <h1>Выход из системы</h1>
+  <hr>
+
+  <h4>Успешный выход</h4>
+
+  <p>Благодарим вас за время, проведённое на этом сайте.</p>
+  <hr>
+
+  <a href="{% url 'web:login' %}">Login</a>
+  <hr>
+
+{% endblock %}

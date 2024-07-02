@@ -1,0 +1,21 @@
+{% extends "webauth/base.html" %}
+
+{% block content %}
+  <h1>Editing personal data</h1>
+  <hr>
+  <p>
+
+    <a href="{% url 'home' %}">Cancel</a>
+
+    <span> &nbsp; &nbsp; |&nbsp; &nbsp; &nbsp;</span>    <!-- 'пробел','&nbsp;','пробел','&nbsp;' -->
+    <a href="{% url 'web:user_update' %}">User Update</a>
+
+    <span> &nbsp; &nbsp;| &nbsp; &nbsp;</span>
+    <a href="{% url 'web:password_change' %}">Password Change</a>
+
+    <span> &nbsp; &nbsp; |&nbsp; &nbsp; &nbsp;</span>    <!-- 'пробел','&nbsp;','пробел','&nbsp;' -->
+    <a href="{% url 'web:user_delete' %}">User Delete</a>
+
+  </p>
+  <hr>
+{% endblock %}

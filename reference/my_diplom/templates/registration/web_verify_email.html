@@ -1,0 +1,8 @@
+{% autoescape off %}
+
+Добрый день, {{ user.get_username }}.
+
+Пожалуйста, перейдите по ссылке, чтобы завершить регистрацию:
+{{ protocol }}://{{ domain }}{% url 'web:email_verify_confirm' key64=key64 token=token %}
+
+{% endautoescape %}

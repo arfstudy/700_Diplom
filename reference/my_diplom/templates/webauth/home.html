@@ -1,0 +1,34 @@
+{% extends "webauth/base.html" %}
+
+{% block content %}
+  <h1>Home page</h1>
+  <hr>
+
+  {% if user.is_authenticated %}
+
+    <!-- Выходить из системы можно только методом "POST". Для этого организована форма. -->
+    <!-- Никакие данные вводить в эту форму не требуется. Нужна только кнопка "Выйти". -->
+    <form action="{% url 'web:logout' %}" method="POST">
+      {% csrf_token %}
+      <p>
+
+        <a href="{% url 'web:user_editing' %}">Editing Personal Data</a>
+        <!-- Тег <span> применён для вставки четырёх пробелов перед вертикальной чертой. -->
+        <span> &nbsp; &nbsp;|</span>    <!-- 'пробел','&nbsp;','пробел','&nbsp;' -->
+
+        <!-- Эту кнопку маскируем под ссылку. -->
+        <input type="submit" class="btn btn-link" value="Logout">
+
+      </p>
+    </form>
+
+  {% else %}
+
+    <a href="{% url 'web:login' %}">Login</a>
+
+    <span>&nbsp; &nbsp;|&nbsp; &nbsp;</span>    <!-- '&nbsp;','пробел','&nbsp;' -->
+    <a href="{% url 'web:register' %}">Register</a>
+
+  {% endif %}
+  <hr>
+{% endblock %}
