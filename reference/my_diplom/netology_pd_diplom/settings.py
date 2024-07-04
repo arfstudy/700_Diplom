@@ -47,6 +47,8 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework.authtoken',
     'django_rest_passwordreset',
+
+    'users',
 ]
 
 MIDDLEWARE = [
@@ -141,7 +143,7 @@ STATIC_URL = 'static/'
 
 
 # Имя класса модели, хранящей список зарегистрированных пользователей.
-# AUTH_USER_MODEL='users.User'
+AUTH_USER_MODEL='users.User'
 
 
 # Настройки почтового сервера.
