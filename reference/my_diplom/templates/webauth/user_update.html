@@ -1,0 +1,32 @@
+{% extends 'webauth/base.html' %}
+
+{% block content %}
+  <h1>Изменение персональных данных</h1>
+  <hr>
+
+  <h4>Введите новые данные в те поля, которые хотите изменить</h4>
+
+  <p>Все представленные поля должны быть заполненными.</p>
+
+  {% if form.errors %}
+    <p>{{ form.errors.errors }}</p>
+  {% endif %}
+
+  <form action="{% url 'web:user_update' %}" method="POST">
+    {% csrf_token %}
+    <table>
+      {{ form.as_table }}
+    </table>
+    <p>&nbsp;</p>
+    <p>
+
+      <a href="{% url 'web:user_editing' %}" class="btn btn-outline-warning">Отменить</a>
+      <span>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;</span>    <!-- '&nbsp;' +6 групп ('пробел','&nbsp;') -->
+
+      <input type="submit" class="btn btn-outline-success" value="Изменить">
+
+    </p>
+    <hr>
+  </form>
+
+{% endblock %}

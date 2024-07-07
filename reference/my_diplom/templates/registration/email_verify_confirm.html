@@ -1,0 +1,29 @@
+{% extends 'webauth/base.html' %}
+
+{% block content %}
+  <h1>Подтверждение электронной почты</h1>
+  <hr>
+
+  <h4>{{ header }}</h4>
+
+  {% for line in msg %}
+    <p>{{ line }}</p>
+  {% endfor %}
+
+  {% if not_verify %}
+
+    <hr>
+    {% if is_register %}
+      <a href='{% url "web:register" %}'>Register</a>
+    {% endif %}
+
+    {% if is_update %}
+      {% if is_restore %}
+        <a href="{% url 'web:user_update' %}">User Update</a>
+      {% endif %}
+    {% endif %}
+
+  {% endif %}
+
+  <hr>
+{% endblock %}

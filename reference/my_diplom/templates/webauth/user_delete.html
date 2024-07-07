@@ -1,0 +1,21 @@
+{% extends 'webauth/base.html' %}
+
+{% block content %}
+  <h1>Удаление пользователя</h1>
+  <hr>
+
+  <h4>Вы уверены, что хотите удалить Себя?</h4>
+
+  <p>После удаления Ваша учётная запись станет недоступной.</p>
+
+  <p>&nbsp;</p>
+  <p>
+
+    <a href="{% url 'web:user_editing' %}" class="btn btn-outline-warning">Отменить</a>
+    <span>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;</span>    <!-- '&nbsp;' +6 групп ('пробел','&nbsp;') -->
+
+    <a href="{% url 'web:user_delete_confirm' %}" class="btn btn-outline-danger">Да, уверен</a>
+
+  </p>
+  <hr>
+{% endblock %}
