@@ -2,8 +2,10 @@ import re
 
 from rest_framework import status
 
-from apiauth.services import complete_user_conversion, delete_token, get_received_keys
+from apiauth.services import (complete_user_conversion, delete_token, get_received_keys, exclude_invalid_fields,
+                              get_choice_fields, check_not_null_and_convert, change_residue)
 from users.emails import describe_keys_verify_result, verify_received_keys
+from users.services import is_restore_old_user
 
 
 def validate_required_fields(incoming_data, fields):
@@ -32,14 +34,24 @@ def verify_received_email(request, old_user_values, model_serializer):
         errors['condition'] = status.HTTP_400_BAD_REQUEST
         return errors
 
-    actions = ['login', 'token', 'register']
+    actions = ['login', 'token', 'register', 'update']
     data, is_verify = verify_received_keys(request, key64, token, actions)
+    is_restore = True
     if not is_verify:
         # Проверяет, что удалось распознать пользователя и его действие.
         context = {key: data[key] for key in ['process_err', 'user_err'] if key in data.keys()}
         if context:
             context['condition'] = status.HTTP_400_BAD_REQUEST
             return context
+
+        # Восстанавливает старые значения пользователя, если, при редактировании, почта не подтвердилась.
+        if data['process'] == 'update' and 'user' in data.keys():
+            is_restore = is_restore_old_user(old_user_values, data['user'])
+            if is_restore:
+                data['user'].email_verify = True
+                data['user'].save(update_fields='email_verify')
+    old_user_values.clear()
+    data['is_restore'] = is_restore
 
     is_reassigned, old_process = False, ''
     if data['process'] == 'token':
@@ -135,3 +147,83 @@ def validate_names_fields(attrs, user_obj=None):
             return attrs, is_valid, errors
 
     return attrs, True, {'warning': 'Нет полей для проверки.'}
+
+
+def validate_choice_fields(data, obj):
+    """ Находит поля Choice-типа и делает проверку.
+    """
+    choice_errors = dict()
+    choice_fields = get_choice_fields(obj)
+    for field in choice_fields.keys():
+        if field in data.keys():
+            data[field], errors_msg = check_not_null_and_convert(data, field, data[field], choice_fields[field],
+                                                                 validate_required_fields)
+            if errors_msg:
+                choice_errors[field] = errors_msg
+
+    return data, choice_errors
+
+
+def compare_with_db(check_form, data, action, obj):
+    """ Проверяет на совпадение переданных значений со значениями из БД.
+        (Проверка выполняется при помощи формы Django.)
+        Для PATCH-запроса останутся только те поля, которые, действительно, несут какие-то изменения.
+        Для PUT-запроса вернутся все поля объекта, даже те (из необязательных), которые небыли переданы.
+        Эти поля получат пустые значения или значения по умолчанию.
+    """
+    null_fields = []
+    res = dict()
+    if check_form.has_changed():
+        changed_count = len(check_form.changed_data)
+        for field in check_form.changed_data:
+            if field in data.keys():
+                res[field] = data[field]
+            else:
+                null_fields.append(field)
+                changed_count -= 1
+        if changed_count > 0:
+            # Для PUT-запроса пропущенные поля заполняем пустыми значениями или значениями по умолчанию.
+            if action in ['put', 'update']:
+                res = change_residue(data, obj, null_fields)
+
+            return res, {}
+
+    return res, {'errors': ['Вы не передали ничего нового.', 'Выполнение прервано.']}
+
+
+def pre_check_incoming_fields(data, required_fields, additional_fields, action, obj, form_class, obj_name='объекта'):
+    """ Предварительно проверяет полученные поля на корректность.
+    """
+    action = action.lower()
+    errors = dict()
+    fields_content = []
+    put_msg = dict()
+    # 1. Отсеиваем поля, которые не входят в допустимые.
+    res, invalid_fields = exclude_invalid_fields(data, {*required_fields, *additional_fields}, obj)
+
+    # 2. Проверяем Choice-поля и подготавливаем к сохранению.
+    res, choice_errors = validate_choice_fields(res, obj)
+
+    # 3. Проверяем обязательные поля. Ошибки: пропущено или пусто.
+    if action in ['post', 'create', 'put', 'update']:
+        errors = validate_required_fields(res, required_fields)
+        if errors:
+            warning = {'warning': [f'Обязательные поля: `{"` `".join(required_fields)}`.',
+                                   f'Дополнительные поля: `{"` `".join(additional_fields)}`.']}
+            if action in ['put', 'update']:
+                put_msg = {'PUT': [f'Для частичного изменения {obj_name} воспользуйтесь PATCH-запросом.']}
+            return res, errors, choice_errors, warning, {**put_msg, **invalid_fields}
+
+    # 4. Проверяем наличие хотя бы одного запланированного изменения.
+    if action in ['put', 'update', 'patch', 'partial_update']:
+        check_form = form_class(data=res, instance=obj)
+        res, errors = compare_with_db(check_form, res, action, obj)
+        if errors:
+            if action in ['put', 'update']:
+                fields_content = [f'Обязательные поля: `{"` `".join(required_fields)}`.',
+                                  f'Дополнительные поля: `{"` `".join(additional_fields)}`.']
+            else:
+                fields_content = [f'Допустимые поля: `{"` `".join({*required_fields, *additional_fields})}`.']
+
+    warning = {'warning': fields_content} if fields_content else {}
+    return res, errors, choice_errors, warning, {**put_msg, **invalid_fields}
