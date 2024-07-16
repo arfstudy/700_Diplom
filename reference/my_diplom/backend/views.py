@@ -5,7 +5,7 @@ from rest_framework.exceptions import NotFound
 from rest_framework.response import Response
 
 from backend import models, serializers
-from backend.services import get_contacts, get_salesman_contacts
+from backend.services import get_contacts, get_salesman_contacts, get_list_shops
 
 Salesman = get_user_model()
 
@@ -54,3 +54,8 @@ class ShopView(viewsets.ModelViewSet):
     """
     queryset = models.Shop.objects.all()
     serializer_class = serializers.ShopSerializer
+
+    def list(self, request, *args, **kwargs):
+        """ Возвращает список магазинов в сокращённом виде.
+        """
+        return Response(data=get_list_shops(self, serializers), status=status.HTTP_200_OK)

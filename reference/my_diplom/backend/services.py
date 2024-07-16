@@ -77,3 +77,18 @@ def is_not_salesman(obj_ser, salesman):
             raise ValidationError(f'Пользователь с id={salesman.id} уже является менеджером одного из магазинов.')
 
     return salesman
+
+
+def get_list_shops(shop_view, serializers_modul):
+    """ Возвращает список магазинов в сокращённом виде.
+    """
+    queryset = shop_view.queryset
+    if 'state' in shop_view.request.GET.keys():
+        if shop_view.request.GET['state'] == 'open':
+            queryset = queryset.filter(state=Shop.Worked.OPEN)
+        elif shop_view.request.GET['state'] == 'close':
+            queryset = queryset.filter(state=Shop.Worked.CLOSE)
+
+    shop_serializer = serializers_modul.ShortShopSerializer(instance=queryset, many=True)
+    return {'shops': [[f"{e['id']}: {e['name']}, state={e['state']}, seller={e['seller']}, buyer={e['buyer']}"]
+                  for e in shop_serializer.data]}
