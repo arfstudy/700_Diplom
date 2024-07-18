@@ -36,3 +36,44 @@ class Contact(models.Model):
         """ Возвращает контакт с 'id' пользователя.
         """
         return f'{self.get_short_contact()}. salesman_id: {self.salesman.id}'
+
+
+class Shop(models.Model):
+    """ Магазин.
+    """
+    class Worked(models.TextChoices):
+        """ Рабочее состояние магазина. """
+        OPEN = 'OP', 'Открыт'
+        CLOSE = 'CL', 'Закрыт'
+
+    name = models.CharField(max_length=50, unique=True, verbose_name='Название')
+    filename = models.URLField(null=True, blank=True, verbose_name='Загрузочный файл')
+    seller = models.OneToOneField(to=Salesman, on_delete=models.SET_NULL, null=True, blank=True, related_name='seller',
+                                  verbose_name='Менеджер по продажам')
+    buyer = models.OneToOneField(to=Salesman, on_delete=models.SET_NULL, null=True, blank=True, related_name='buyer',
+                                 verbose_name='Менеджер по закупкам')
+    state = models.CharField(max_length=2, choices=Worked.choices, default=Worked.CLOSE, verbose_name='Приём заказов')
+
+    objects = models.Manager()
+    DoesNotExist = models.Manager
+
+    class Meta:
+        verbose_name = 'Магазин'
+        verbose_name_plural = "Список магазинов"
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+    def save(self, *args, **kwargs):
+        """ Сохраняет состояние магазина.
+            Если у магазина нет "Менеджера по продажам", то он не может торговать - он закрыт.
+            Если есть "Менеджер по продажам" и не передаётся статус "Приём заказов", то устанавливается "Открыт".
+        """
+        if self.seller:
+            if not self.state:
+                self.state = Shop.Worked.OPEN
+        else:
+            self.state = Shop.Worked.CLOSE
+
+        return super().save(*args, **kwargs)

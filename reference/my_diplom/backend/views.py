@@ -1,11 +1,12 @@
 from django.contrib.auth import get_user_model
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
-from rest_framework.exceptions import NotFound
+from rest_framework.exceptions import NotFound, MethodNotAllowed
 from rest_framework.response import Response
 
 from backend import models, serializers
-from backend.services import get_contacts, get_salesman_contacts
+from backend.permissions import ShopPermissions
+from backend.services import get_contacts, get_salesman_contacts, get_list_shops
 
 Salesman = get_user_model()
 
@@ -47,3 +48,30 @@ class ContactsListView(viewsets.GenericViewSet):
             return Response(data=salesmans_list, status=status.HTTP_200_OK)
 
         raise NotFound('Page not found.')
+
+
+class ShopView(viewsets.ModelViewSet):
+    """ Класс для работы с моделью магазина.
+    """
+    queryset = models.Shop.objects.all()
+    serializer_class = serializers.ShopSerializer
+    permission_classes = [ShopPermissions]
+
+    def list(self, request, *args, **kwargs):
+        """ Возвращает список магазинов в сокращённом виде.
+        """
+        return Response(data=get_list_shops(self, serializers), status=status.HTTP_200_OK)
+
+    def destroy(self, request, *args, **kwargs):
+        """ Удаляет магазин.
+        """
+        pk = kwargs.get('pk', None)
+        if not pk:
+            raise MethodNotAllowed('Удаление не возможно.')
+        try:
+            shop = models.Shop.objects.get(pk=pk)
+        except:
+            raise NotFound(f'Магазин с id={pk} не найден.')
+
+        shop.delete()
+        return Response(data={'detail': f'Магазин с id={pk} удалён.'}, status=status.HTTP_204_NO_CONTENT)
