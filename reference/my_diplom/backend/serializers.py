@@ -156,3 +156,36 @@ class CategorySerializer(serializers.ModelSerializer):
         model = models.Category
         fields = ['id', 'name', 'catalog_number']
         read_only_fields = ['id']
+
+
+class ProductSerializer(serializers.ModelSerializer):
+    """ Сериализатор для отображения и сохранения товара и его категории.
+    """
+    category = serializers.StringRelatedField()
+
+    class Meta:
+        model = models.Product
+        fields = ['name', 'category']
+
+
+class ProductParameterSerializer(serializers.ModelSerializer):
+    """ Сериализатор для отображения и сохранения характеристик товара.
+    """
+    parameter = serializers.StringRelatedField()
+
+    class Meta:
+        model = models.ProductParameter
+        fields = ['parameter', 'value']
+
+
+class ProductInfoSerializer(serializers.ModelSerializer):
+    """ Сериализатор для отображения и сохранения дополнительных сведений товара.
+    """
+    product = ProductSerializer(read_only=True)
+    shop = serializers.StringRelatedField()
+    product_parameters = ProductParameterSerializer(read_only=True, many=True)
+
+    class Meta:
+        model = models.ProductInfo
+        fields = ['id', 'model', 'catalog_number', 'product', 'shop', 'quantity', 'price_rrc', 'product_parameters']
+        read_only_fields = ['id']

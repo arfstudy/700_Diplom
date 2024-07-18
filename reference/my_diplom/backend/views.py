@@ -6,7 +6,7 @@ from rest_framework.response import Response
 
 from backend import models, serializers
 from backend.permissions import ShopPermissions, IsAuthenticatedPermissions
-from backend.services import get_contacts, get_salesman_contacts, get_list_shops
+from backend.services import get_contacts, get_salesman_contacts, get_list_shops, get_products_list
 
 Salesman = get_user_model()
 
@@ -83,3 +83,16 @@ class CategoryView(generics.ListAPIView):
     queryset = models.Category.objects.all()
     serializer_class = serializers.CategorySerializer
     permission_classes = [IsAuthenticatedPermissions]
+
+
+class ProductInfoView(generics.ListAPIView):
+    """ Класс для просмотра списка товаров (прайса) с дополнительными сведениями.
+    """
+    queryset = models.ProductInfo.objects.all()
+    serializer_class = serializers.ProductInfoSerializer
+    permission_classes = [IsAuthenticatedPermissions]
+
+    def get_queryset(self):
+        """ Изменяет перечень возвращаемых данных с учётом фильтров.
+        """
+        return get_products_list(self)

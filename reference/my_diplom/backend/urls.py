@@ -21,4 +21,5 @@ urlpatterns = [
     # Показывает контакты в сокращённом виде.           http://127.0.0.1:8000/api/v1/backend/short_contacts/
     # Работает с магазинами.                            http://127.0.0.1:8000/api/v1/backend/shop/
     path('categories/', views.CategoryView.as_view(), name='categories'),
+    path('price/', views.ProductInfoView.as_view(), name='price'),
 ] + router.urls

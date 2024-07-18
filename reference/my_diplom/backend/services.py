@@ -2,7 +2,7 @@ from django.contrib.auth import get_user_model
 from django.db.models import Q
 from rest_framework.exceptions import NotFound, ValidationError
 
-from backend.models import Contact, Shop
+from backend.models import Contact, Shop, ProductInfo
 
 Salesman = get_user_model()
 
@@ -101,3 +101,24 @@ def get_list_shops(shop_view, serializers_modul):
     shop_serializer = serializers_modul.ShortShopSerializer(instance=queryset, many=True)
     return {'shops': [[f"{e['id']}: {e['name']}, state={e['state']}, seller={e['seller']}, buyer={e['buyer']}"]
                   for e in shop_serializer.data]}
+
+
+def get_products_list(self):
+    """ Возвращает список товаров.
+        Регулирует перечень возвращаемых данных в зависимости от запрошенных параметров.
+    """
+    query = Q(shop__state=Shop.Worked.OPEN) & Q(quantity__gt=0)
+    shop_id = self.request.GET.get('shop_id')
+    category_id = self.request.GET.get('category_id')
+
+    if shop_id:
+        query = query & Q(shop_id=shop_id)
+
+    if category_id:
+        query = query & Q(product__category_id=category_id)
+
+    # Фильтруем и отбрасываем дубликаты.
+    queryset = ProductInfo.objects.filter(query).select_related('shop', 'product__category').prefetch_related(
+        'product_parameters__parameter').distinct()
+
+    return queryset
