@@ -25,3 +25,13 @@ class ShopPermissions(permissions.BasePermission):
 
         # PUT и DELETE-методы предоставляется администраторам или суперпользователям.
         return bool(request.user and (request.user.is_staff or request.user.is_superuser))
+
+
+class IsAuthenticatedPermissions(permissions.BasePermission):
+    """ Класс для разрешения на просмотр всем авторизованным.
+    """
+
+    def has_permission(self, request, view):
+        """ Проверяет клиента на то, что он является авторизованным.
+        """
+        return bool(request.user and request.user.is_authenticated)

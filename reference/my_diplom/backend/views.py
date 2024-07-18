@@ -1,11 +1,11 @@
 from django.contrib.auth import get_user_model
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, generics
 from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound, MethodNotAllowed
 from rest_framework.response import Response
 
 from backend import models, serializers
-from backend.permissions import ShopPermissions
+from backend.permissions import ShopPermissions, IsAuthenticatedPermissions
 from backend.services import get_contacts, get_salesman_contacts, get_list_shops
 
 Salesman = get_user_model()
@@ -75,3 +75,11 @@ class ShopView(viewsets.ModelViewSet):
 
         shop.delete()
         return Response(data={'detail': f'Магазин с id={pk} удалён.'}, status=status.HTTP_204_NO_CONTENT)
+
+
+class CategoryView(generics.ListAPIView):
+    """ Класс для просмотра модели категорий.
+    """
+    queryset = models.Category.objects.all()
+    serializer_class = serializers.CategorySerializer
+    permission_classes = [IsAuthenticatedPermissions]

@@ -146,3 +146,13 @@ class ShopSerializer(serializers.ModelSerializer):
             is_permission_updated(self, attrs)
 
         return attrs
+
+
+class CategorySerializer(serializers.ModelSerializer):
+    """ Сериализатор для отображения и сохранения категорий товара.
+    """
+
+    class Meta:
+        model = models.Category
+        fields = ['id', 'name', 'catalog_number']
+        read_only_fields = ['id']
