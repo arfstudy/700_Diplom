@@ -2,7 +2,8 @@ from django.contrib.auth import get_user_model
 from django.db.models import Q
 from rest_framework.exceptions import NotFound, ValidationError
 
-from backend.models import Contact, Shop, ProductInfo
+from apiauth.services import verify_choices
+from backend.models import Contact, Shop, ProductInfo, Order
 
 Salesman = get_user_model()
 
@@ -122,3 +123,28 @@ def get_products_list(self):
         'product_parameters__parameter').distinct()
 
     return queryset
+
+
+def get_orders_list(order_view, serializers_modul):
+    """ Возвращает список заказов.
+        Регулирует перечень возвращаемых данных в зависимости от запрошенных параметров.
+    """
+    query = Q(customer=order_view.request.user)
+    # Возможные варианты состояния заказа: 'basket', 'new', 'confirmed', 'assembled', 'sent', 'canceled', 'received'.
+    # Так же возможны значения, сохраняемые в БД, и человеко читаемые значения - все регистронезависимые.
+    if 'state' in order_view.request.GET.keys():
+        value = order_view.request.GET['state']
+        # Проверяем query-параметр 'state' на принадлежность к значениям перечисляемого типа.
+        value, errors = verify_choices(value, Order.Status)
+        if errors:
+            errors = {'errors': [f'Неправильное значение query-параметра `state={value}`.'] + [errors['errors']]}
+            raise ValidationError(detail=errors)
+
+        query = query & Q(state=value)
+
+    queryset = Order.objects.filter(query).select_related('contact').prefetch_related(
+        'ordered_items', 'ordered_items__product_info').distinct()
+
+    items_serializer = serializers_modul.OrderListSerializer(instance=queryset, many=True)
+
+    return items_serializer.data

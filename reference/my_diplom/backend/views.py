@@ -1,12 +1,12 @@
 from django.contrib.auth import get_user_model
 from rest_framework import viewsets, status, generics
 from rest_framework.decorators import action
-from rest_framework.exceptions import NotFound, MethodNotAllowed
+from rest_framework.exceptions import NotFound, MethodNotAllowed, ValidationError
 from rest_framework.response import Response
 
 from backend import models, serializers
-from backend.permissions import ShopPermissions, IsAuthenticatedPermissions
-from backend.services import get_contacts, get_salesman_contacts, get_list_shops, get_products_list
+from backend.permissions import ShopPermissions, IsAuthenticatedPermissions, IsOwnerPermissions
+from backend.services import get_contacts, get_salesman_contacts, get_list_shops, get_products_list, get_orders_list
 
 Salesman = get_user_model()
 
@@ -96,3 +96,24 @@ class ProductInfoView(generics.ListAPIView):
         """ Изменяет перечень возвращаемых данных с учётом фильтров.
         """
         return get_products_list(self)
+
+
+class BasketView(viewsets.GenericViewSet):
+    """ Класс для работы с корзиной пользователя.
+
+        Methods:
+        - get: Retrieve the items in the user's basket.
+        - post: Add an item to the user's basket.
+        - put: Update the quantity of an item in the user's basket.
+        - delete: Remove an item from the user's basket.
+
+        Attributes:
+        - None
+    """
+    queryset = models.Order.objects.all()
+    permission_classes = [IsOwnerPermissions]
+
+    def list(self, request, *args, **kwargs):
+        """ Возвращает заказы пользователя, который выполнил запрос.
+        """
+        return Response(data=get_orders_list(self, serializers), status=status.HTTP_200_OK)

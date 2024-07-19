@@ -189,3 +189,26 @@ class ProductInfoSerializer(serializers.ModelSerializer):
         model = models.ProductInfo
         fields = ['id', 'model', 'catalog_number', 'product', 'shop', 'quantity', 'price_rrc', 'product_parameters']
         read_only_fields = ['id']
+
+
+class ShortOrderItemSerializer(serializers.ModelSerializer):
+    """ Сериализатор для отображения товара в сокращённом формате.
+    """
+    product = serializers.StringRelatedField(source='product_info', read_only=True)
+
+    class Meta:
+        model = models.OrderItem
+        fields = ['product', 'quantity']
+
+
+class OrderListSerializer(serializers.ModelSerializer):
+    """ Сериализатор для отображения списка заказов.
+    """
+    state = serializers.CharField(source='get_state_display', read_only=True)
+    ordered_items = ShortOrderItemSerializer(read_only=True, many=True)
+    contact = ContactSerializer(read_only=True)
+
+    class Meta:
+        model = models.Order
+        fields = ['id', 'state', 'updated_state', 'ordered_items', 'sum', 'contact', 'created_at']
+        read_only_fields = ['id']

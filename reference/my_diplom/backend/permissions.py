@@ -35,3 +35,12 @@ class IsAuthenticatedPermissions(permissions.BasePermission):
         """ Проверяет клиента на то, что он является авторизованным.
         """
         return bool(request.user and request.user.is_authenticated)
+
+
+class IsOwnerPermissions(permissions.BasePermission):
+    """ Класс для разрешения на внесение исправлений в объекты только их авторам."""
+
+    def has_object_permission(self, request, view, obj):
+        """ Проверяет клиента на то, что он является автором объекта.
+        """
+        return bool(request.user and request.user == obj.user)
