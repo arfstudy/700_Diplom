@@ -1,12 +1,14 @@
 from django.contrib.auth import get_user_model
+from django.db import transaction
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
 from apiauth.validators import pre_check_incoming_fields
 from backend import models
 from backend.forms import ContactHasDiffForm, ShopHasDiffForm
-from backend.services import get_transmitted_obj, join_choice_errors, replace_salesmans_errors
-from backend.validators import is_not_salesman, is_permission_updated
+from backend.services import (get_transmitted_obj, join_choice_errors, replace_salesmans_errors,
+                              get_category_by_name_and_catalog_number)
+from backend.validators import is_not_salesman, is_permission_updated, is_validate_exists_shop
 
 Salesman = get_user_model()
 
@@ -151,23 +153,77 @@ class ShopSerializer(serializers.ModelSerializer):
 
 
 class CategorySerializer(serializers.ModelSerializer):
-    """ Сериализатор для отображения и сохранения категорий товара.
+    """ Сериализатор для создания, отображения и изменения Категории товара.
     """
+    stores = serializers.StringRelatedField(source='shops', read_only=True, many=True)
 
     class Meta:
         model = models.Category
-        fields = ['id', 'name', 'catalog_number']
-        read_only_fields = ['id']
+        fields = ['id', 'name', 'catalog_number', 'stores', 'shops']
+        extra_kwargs = {
+            'id': {'read_only': True},
+            'shops': {'required': False, 'write_only': True, 'many': True}
+        }
+
+    def to_internal_value(self, validated_data):
+        """ Добавляет собственные предварительные проверки.
+        """
+        # Проверяет магазины на существующие и несуществующие, очищает от повторяющихся.
+        errors_msg = ''
+        if 'shops' in validated_data.keys() and validated_data['shop']:
+            is_exists, errors_msg = is_validate_exists_shop(validated_data)
+            if not is_exists:
+                raise ValidationError(detail={'shops': errors_msg})
+
+        if not self.instance:
+            # Получает Категорию, если она существует.
+            name = validated_data.get('name', '')
+            catalog_number = int(validated_data.get('catalog_number', 0))
+            category = get_category_by_name_and_catalog_number(name, catalog_number)
+            if category:
+                self.instance = category
+            # Переходит в режим 'update'.
+
+        # Встроенная проверка Django полученных полей на корректность.
+        try:
+            ret = super().to_internal_value(validated_data)
+        except ValidationError as e:
+            errors = {k: [str(v[0])] for k, v in e.detail.items()}
+            if errors_msg:
+                errors = {**errors, 'shops': errors_msg}
+            raise ValidationError(detail=errors)
+
+        if errors_msg:
+            # Передаёт предупреждение во "вьюшку", какие магазины оказались несуществующими.
+            self.context['warning'] = {'shops': errors_msg}
+
+        return ret
+
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        """ Вносит изменения в Категорию.
+            Связи с новыми магазинами добавляются к старым, а не замещают их.
+        """
+        instance.name = validated_data.get('name', instance.name)
+        instance.catalog_number = validated_data.get('catalog_number', instance.catalog_number)
+        shops = validated_data.pop('shops')
+        if shops:
+            instance.shops.add(*shops)
+        instance.save()
+        return instance
 
 
 class ProductSerializer(serializers.ModelSerializer):
-    """ Сериализатор для отображения и сохранения товара и его категории.
+    """ Сериализатор для отображения и сохранения товара.
     """
-    category = serializers.StringRelatedField()
+    category = CategorySerializer(required=False)
 
     class Meta:
         model = models.Product
-        fields = ['name', 'category']
+        fields = ['id', 'name', 'category']
+        extra_kwargs = {
+            'id': {'read_only': True},
+        }
 
 
 class ProductParameterSerializer(serializers.ModelSerializer):
@@ -208,9 +264,9 @@ class OrderListSerializer(serializers.ModelSerializer):
     """
     state = serializers.CharField(source='get_state_display', read_only=True)
     ordered_items = ShortOrderItemSerializer(read_only=True, many=True)
-    contact = ContactSerializer(read_only=True)
+    contact = ShortContactSerializer(read_only=True)
 
     class Meta:
         model = models.Order
         fields = ['id', 'state', 'updated_state', 'ordered_items', 'sum', 'contact', 'created_at']
-        read_only_fields = ['id']
+        read_only_fields = ['id', 'updated_state', 'sum', 'created_at']

@@ -1,9 +1,10 @@
 from django.contrib.auth import get_user_model
+from django.core.exceptions import MultipleObjectsReturned
 from django.db.models import Q
 from rest_framework.exceptions import NotFound, ValidationError
 
 from apiauth.services import verify_choices
-from backend.models import Contact, Shop, ProductInfo, Order
+from backend.models import Contact, Shop, ProductInfo, Order, Category
 
 Salesman = get_user_model()
 
@@ -118,8 +119,51 @@ def replace_salesmans_errors(errors, res):
     return
 
 
+def get_category(param):
+    """ Возвращает объект категории по ключам 'pk' или 'name'.
+        Но НЕ 'catalog_number', поля должны быть разных типов. Тип 'int' занят 'pk'.
+    """
+    try:
+        category = Category.objects.get(pk=param)
+    except (TypeError, ValueError, OverflowError, Category.DoesNotExist, MultipleObjectsReturned, ValidationError):
+        pass
+    else:
+        return category
+    try:
+        category = Category.objects.get(name=param)
+    except (TypeError, ValueError, OverflowError, Category.DoesNotExist, MultipleObjectsReturned, ValidationError):
+        return None
+
+    return category
+
+
+def get_category_by_name_and_catalog_number(name='', catalog_number=0):
+    """ Находит категорию с полученными значениями полей 'name' и 'catalog_number' или одному из них.
+        Попутно проверяется корректность сочетания этих полей, если переданы оба параметра.
+    """
+    if not name and not catalog_number:
+        raise ValidationError(detail={'errors': ['Необходимо передать хотя бы один из параметров `name`'
+                                                 ' или `catalog_number`.']})
+
+    error_msg = [f'Категория с названием `{name}` не соответствует номеру по каталогу `{catalog_number}`.']
+    if name and Category.objects.filter(name=name).exists():
+        category = Category.objects.get(name=name)
+        if catalog_number != 0 and catalog_number != category.catalog_number:
+            raise ValidationError(detail={'errors': error_msg})
+
+        return category
+
+    if catalog_number != 0 and Category.objects.filter(catalog_number=catalog_number).exists():
+        if name:
+            raise ValidationError(detail={'errors': error_msg})
+
+        return Category.objects.get(catalog_number=catalog_number)
+
+    return None
+
+
 def get_products_list(self):
-    """ Возвращает список товаров.
+    """ Возвращает Прайс, список товаров.
         Регулирует перечень возвращаемых данных в зависимости от запрошенных параметров.
     """
     query = Q(shop__state=Shop.Worked.OPEN) & Q(quantity__gt=0)

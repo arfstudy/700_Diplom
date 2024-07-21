@@ -81,20 +81,10 @@ class ShopPermission(permissions.BasePermission):
         return bool(request.user and (request.user.is_staff or request.user.is_superuser))
 
 
-class IsAuthenticatedPermissions(permissions.BasePermission):
-    """ Класс для разрешения на просмотр всем авторизованным.
-    """
-
-    def has_permission(self, request, view):
-        """ Проверяет клиента на то, что он является авторизованным.
-        """
-        return bool(request.user and request.user.is_authenticated)
-
-
 class IsOwnerPermissions(permissions.BasePermission):
     """ Класс для разрешения на внесение исправлений в объекты только их авторам."""
 
     def has_object_permission(self, request, view, obj):
         """ Проверяет клиента на то, что он является автором объекта.
         """
-        return bool(request.user and request.user == obj.user)
+        return bool(request.user and request.user == obj.customer)

@@ -82,3 +82,20 @@ def not_salesman(user):
         return False
 
     return True
+
+
+def is_validate_exists_shop(validated_data):
+    """ Проверяет существование хотя бы одного магазина.
+        Удаляет дублирующие магазины.
+    """
+    errors_msg, shops_list, flag = [], [], False
+    shops = set(validated_data.pop('shops', []))    # Отсеивает дублирование.
+    for shop_id in shops:
+        if Shop.objects.filter(id=shop_id).exists():
+            shops_list.append(shop_id)
+            flag = True
+        else:
+            errors_msg.append(f'Магазин с id={shop_id} не существует.')
+
+    validated_data['shops'] = shops_list if flag else list(shops)
+    return flag, errors_msg

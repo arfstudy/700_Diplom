@@ -1,12 +1,15 @@
 from django.contrib.auth import get_user_model
 from rest_framework import viewsets, status, generics
 from rest_framework.decorators import action
+from rest_framework.exceptions import NotFound
+from rest_framework.filters import SearchFilter
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 
 from backend import models, serializers
-from backend.permissions import IsAdminOrReadOnly, ShopPermission, IsAuthenticatedPermissions, IsOwnerPermissions
-from backend.services import get_contacts, get_short_contacts, get_shops, get_products_list, get_orders_list
+from backend.permissions import IsAdminOrReadOnly, ShopPermission, IsOwnerPermissions
+from backend.services import (get_contacts, get_short_contacts, get_shops, get_shop, get_category, get_products_list,
+                              get_orders_list)
 
 Salesman = get_user_model()
 
@@ -124,12 +127,53 @@ class ShopView(viewsets.ModelViewSet):
         return Response(data={'detail': [f'Магазин с id={pk} удалён.']}, status=status.HTTP_204_NO_CONTENT)
 
 
-class CategoryView(generics.ListAPIView):
-    """ Класс для просмотра модели категорий.
+class CategoryView(viewsets.ModelViewSet):
+    """ Класс для создания, просмотра, изменения и удаления Категории.
     """
     queryset = models.Category.objects.all()
     serializer_class = serializers.CategorySerializer
-    permission_classes = [IsAuthenticatedPermissions]
+    permission_classes = [IsAdminOrReadOnly]
+    # Показывает категории определённого магазина. Команда: '.../?shop_name=<shop_name>'.
+    search_fields = ['shops__name']
+    SearchFilter.search_param = 'shop_name'
+
+    def create(self, request, *args, **kwargs):
+        """ Создаёт новую категорию.
+        """
+        category_ser = serializers.CategorySerializer(data=request.data)
+        category_ser.is_valid(raise_exception=True)
+        category_ser.save()
+        # Получает предупреждение, если не все магазины оказались существующими.
+        warning = category_ser.context.pop('warning', {})
+        return Response(data={**category_ser.data, **warning}, status=status.HTTP_201_CREATED)
+
+    @action(methods=['patch'], detail=True, url_path='drop_shop')
+    def drop_shop(self, request, pk):
+        """ Отвязывает категорию от указанного магазина
+            по запросу: PATCH 'http://127.0.0.1:8000/api/v1/backend/category/<pk>/drop_shop/'.
+            'id' отвязываемого магазина передаётся в теле запроса 'body'.
+        """
+        category = get_category(pk)
+        if not category:
+            raise NotFound(detail={'category': [f'Категория с id={pk} не существует.']})
+
+        shop_id = int(request.data.get('shop_id', 0))
+        shop = get_shop(shop_id)
+        if not shop:
+            raise NotFound(detail={'shop': [f'Магазин с id={shop_id} не существует.']})
+
+        # Проверяет, что в Магазине нет Товаров выбранной Категории.
+        if models.Product.objects.filter(category=category, product_infos__shop=shop).exists():
+            content = {'detail':
+                           f'Эту Категорию нельзя удалить из Магазина `{shop.name}`, так как есть зависимые Товары.'}
+            state = status.HTTP_405_METHOD_NOT_ALLOWED
+        else:
+            category.shops.remove(shop)
+            content = {'detail': f'Эта Категория удалена из Магазина `{shop.name}`.'}
+            state = status.HTTP_200_OK
+
+        return Response(data={**content, 'category': serializers.CategorySerializer(instance=category).data},
+                        status=state)
 
 
 class ProductInfoView(generics.ListAPIView):
@@ -137,7 +181,7 @@ class ProductInfoView(generics.ListAPIView):
     """
     queryset = models.ProductInfo.objects.all()
     serializer_class = serializers.ProductInfoSerializer
-    permission_classes = [IsAuthenticatedPermissions]
+    permission_classes = [IsAdminOrReadOnly]
 
     def get_queryset(self):
         """ Изменяет перечень возвращаемых данных с учётом фильтров.
