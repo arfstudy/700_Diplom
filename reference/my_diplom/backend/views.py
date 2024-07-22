@@ -212,6 +212,14 @@ class CategoryView(viewsets.ModelViewSet):
                         status=state)
 
 
+class ProductView(viewsets.ModelViewSet):
+    """ Класс для создания и просмотра Товара.
+    """
+    queryset = models.Product.objects.all()
+    serializer_class = serializers.ProductSerializer
+    permission_classes = [IsAdminOrReadOnly]
+
+
 class ProductInfoView(generics.ListAPIView):
     """ Класс для просмотра списка товаров (прайса) с дополнительными сведениями.
     """

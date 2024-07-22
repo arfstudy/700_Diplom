@@ -7,7 +7,7 @@ from apiauth.validators import pre_check_incoming_fields
 from backend import models
 from backend.forms import ContactHasDiffForm, ShopHasDiffForm
 from backend.services import (get_transmitted_obj, join_choice_errors, replace_salesmans_errors,
-                              get_category_by_name_and_catalog_number, get_category)
+                              get_category_by_name_and_catalog_number, get_category, get_category_by_catalog_number)
 from backend.validators import is_not_salesman, is_permission_updated, is_validate_exists
 
 Salesman = get_user_model()
@@ -245,16 +245,44 @@ class CategorySerializer(serializers.ModelSerializer):
 
 
 class ProductSerializer(serializers.ModelSerializer):
-    """ Сериализатор для отображения и сохранения товара.
+    """ Сериализатор для создания и отображения Товара.
     """
-    category = CategorySerializer(required=False)
+    category = serializers.StringRelatedField(read_only=True)
+    category_number = serializers.CharField(source='category.catalog_number', write_only=True, required=False)
+    shops = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = models.Product
-        fields = ['id', 'name', 'category']
-        extra_kwargs = {
-            'id': {'read_only': True},
-        }
+        fields = ['id', 'name', 'category', 'category_number', 'shops']
+        read_only_fields = ['id']
+
+    @staticmethod
+    def get_shops(obj):
+        products = obj.product_infos.all()
+        shops = [str(p.shop) for p in products]
+        return shops
+
+    @staticmethod
+    def validate_category_number(value):
+        """ Проверяет, что существует категория с заданным номером.
+        """
+        if not models.Category.objects.filter(catalog_number=value).exists():
+            raise NotFound(f'Категория с номером catalog_number={value} не найдена.')
+
+        return value
+
+    @transaction.atomic
+    def create(self, validated_data):
+        """ Создаёт новый товар.
+        """
+        category, data = get_category_by_catalog_number(validated_data)
+
+        product = super().create(data)
+        if category:
+            product.category = category
+            product.save(update_fields=['category'])
+
+        return product
 
 
 class ProductParameterSerializer(serializers.ModelSerializer):

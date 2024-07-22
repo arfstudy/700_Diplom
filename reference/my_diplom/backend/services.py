@@ -162,6 +162,18 @@ def get_category_by_name_and_catalog_number(name='', catalog_number=0):
     return None
 
 
+def get_category_by_catalog_number(validated_data):
+    """ Возвращает категорию, если передан её номер по каталогу 'catalog_number'.
+    """
+    data = validated_data.copy()
+    category = data.pop('category', {})
+    if category:
+        category_obj = get_category_by_name_and_catalog_number(catalog_number=category['catalog_number'])
+        return category_obj, data
+
+    return None, validated_data
+
+
 def get_products_list(self):
     """ Возвращает Прайс, список товаров.
         Регулирует перечень возвращаемых данных в зависимости от запрошенных параметров.
