@@ -213,7 +213,7 @@ class CategoryView(viewsets.ModelViewSet):
 
 
 class ProductView(viewsets.ModelViewSet):
-    """ Класс для создания и просмотра Товара.
+    """ Класс для создания, просмотра, изменения и удаления Товара.
     """
     queryset = models.Product.objects.all()
     serializer_class = serializers.ProductSerializer

@@ -245,7 +245,7 @@ class CategorySerializer(serializers.ModelSerializer):
 
 
 class ProductSerializer(serializers.ModelSerializer):
-    """ Сериализатор для создания и отображения Товара.
+    """ Сериализатор для создания, отображения и изменения Товара.
     """
     category = serializers.StringRelatedField(read_only=True)
     category_number = serializers.CharField(source='category.catalog_number', write_only=True, required=False)
@@ -283,6 +283,19 @@ class ProductSerializer(serializers.ModelSerializer):
             product.save(update_fields=['category'])
 
         return product
+
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        """ Вносит изменения в товар.
+        """
+        category_obj, data = get_category_by_catalog_number(validated_data)
+
+        instance.name = validated_data.get("name", instance.name)
+        if category_obj:
+            instance.category = category_obj
+
+        instance.save()
+        return instance
 
 
 class ProductParameterSerializer(serializers.ModelSerializer):
