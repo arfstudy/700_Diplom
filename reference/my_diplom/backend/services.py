@@ -250,6 +250,35 @@ def get_product_infos(product_view):
     return queryset
 
 
+def not_exists_category(name, catalog_number):
+    """ Определяет отсутствие в БД категории с полученными значениями полей.
+    """
+    return not Category.objects.filter(name=name, catalog_number=catalog_number).exists()
+
+
+def converting_categories_data(categories):
+    """ Подготавливает данные к сохранению Категорий товара через сериализатор.
+        Меняет ключи из словаря загруженных данных на перечень и структуру ключей сериализатора 'CategorySerializer'.
+        Категории, которые уже есть в БД, отбрасываются. Будут сохранены только новые.
+    """
+    content = [{'name': e['name'], 'catalog_number': e['id']}
+               for e in categories if not_exists_category(e['name'], e['id'])]
+
+    return content
+
+
+def converting_products_data(goods_dict, shop_name):
+    """ Подготавливает данные к сохранению Описания товара через сериализатор.
+        Меняет ключи из словаря загруженных данных на перечень и структуру ключей сериализатора 'ProductInfoSerializer'.
+    """
+    content = [{'name': e['name'], 'model': e['model'], 'external_id': e['id'], 'quantity': e['quantity'],
+                'price': e['price'], 'price_rrc': e['price_rrc'], 'product_parameters': [
+                {'parameter': k, 'value': str(v)} for k, v in e['parameters'].items()],
+                'category_number': e['category'], 'shop_name': shop_name} for e in goods_dict]
+
+    return content
+
+
 def get_products_list(self):
     """ Возвращает Прайс, список товаров.
         Регулирует перечень возвращаемых данных в зависимости от запрошенных параметров.

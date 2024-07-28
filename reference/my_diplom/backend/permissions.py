@@ -86,6 +86,22 @@ class ShopPermission(permissions.BasePermission):
         return bool(request.user and (request.user.is_staff or request.user.is_superuser))
 
 
+class IsBuyer(permissions.BasePermission):
+    """ Выдаёт разрешение Менеджерам по закупкам или администраторам.
+    """
+    message = 'Вы не являетесь `Менеджером по закупкам`.'
+
+    def has_permission(self, request, view):
+        """ Проверяет клиента на то, что он является Менеджером по закупкам.
+        """
+        if request.method == 'POST':
+            # Если полученный метод создаёт новый объект, то права доступа предоставляются Менеджеру по закупкам.
+            return bool(request.user and ((hasattr(request.user, 'buyer') and request.user.buyer)
+                                          or request.user.is_staff or request.user.is_superuser))
+
+        return bool(request.user and (request.user.is_staff or request.user.is_superuser))
+
+
 class IsOwnerPermissions(permissions.BasePermission):
     """ Класс для разрешения на внесение исправлений в объекты только их авторам."""
 

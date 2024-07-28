@@ -27,6 +27,7 @@ urlpatterns = [
     # Работает с категориями.                           http://127.0.0.1:8000/api/v1/backend/category/
     # Работает с товарами.                              http://127.0.0.1:8000/api/v1/backend/product/
     # Работает с описанием товара.                      http://127.0.0.1:8000/api/v1/backend/prod_info/
+    path('upload/', views.PartnerUpdate.as_view(), name='upload'),
     path('price/', views.PriceView.as_view(), name='price'),
     # Работает с корзиной и общим списком заказов.      http://127.0.0.1:8000/api/v1/backend/orders/
 ] + router.urls

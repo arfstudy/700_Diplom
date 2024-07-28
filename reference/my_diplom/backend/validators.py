@@ -1,8 +1,12 @@
+from django.core.files.uploadedfile import InMemoryUploadedFile
+from django.core.validators import URLValidator
 from django.db.models import Q
-from rest_framework.exceptions import PermissionDenied, ValidationError
+from requests import get
+from rest_framework.exceptions import PermissionDenied, ValidationError, NotFound
+from yaml import load as load_yaml, Loader
 
 from backend.models import Shop, Category, Product, ProductParameter, ProductInfo
-from backend.services import get_category, get_or_create_parameter
+from backend.services import get_category, get_or_create_parameter, get_shop
 
 
 def is_not_salesman(obj_ser, salesman):
@@ -197,3 +201,47 @@ def delete_product_info(product_info):
         prod.delete()
 
     return result
+
+
+def load_yaml_data(request):
+    """ Загружает данные из внешнего источника.
+        Ссылка может указывать как на ресурс в интернете, так и на файл на компьютере.
+        При загрузке из файла указать тип данных в запросе Content-Type: 'multipart/form-data'.
+    """
+    url = request.data.get('url')
+    if not url:
+        raise ValidationError({'detail': ['Не задана ссылка на ресурс.']})
+
+    if isinstance(url, str):
+        validate_url = URLValidator()
+        try:
+            validate_url(url)
+        except ValidationError as e:
+            raise ValidationError({'detail': str(e)})
+
+        stream = get(url).content
+
+    elif isinstance(url, InMemoryUploadedFile):
+        stream = url
+
+    else:
+        raise ValidationError({'detail': ['Источник может быть задан ссылкой на интернет-ресурс или файлом '
+                                          'с Вашего компьютера, путём выбора его в форме с полем `FileField`.']})
+
+    data = load_yaml(stream=stream, Loader=Loader)    # Здесь можно организовать проверку десериализации.
+
+    return data
+
+
+def get_shop_obj(request, shop_name):
+    """ Проверяет, что магазин существует и пользователю можно выполнить загрузку.
+    """
+    shop = get_shop(shop_name)
+    if not shop:
+        raise NotFound(detail={'shop': [f'Магазин с названием `{shop_name}` не существует.']})
+
+    # Загружать новый товар разрешено "Менеджерам по закупкам" своего магазина.
+    if not bool(request.user and ((shop.buyer == request.user) or request.user.is_staff or request.user.is_superuser)):
+        raise PermissionDenied(detail={'detail': f'Вы не являетесь `Менеджером по закупкам` магазина `{shop_name}`.'})
+
+    return shop

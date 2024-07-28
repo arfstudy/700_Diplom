@@ -1,17 +1,18 @@
 from django.contrib.auth import get_user_model
 from django.db import transaction
-from rest_framework import viewsets, status, generics
+from rest_framework import viewsets, status, generics, views
 from rest_framework.decorators import action
-from rest_framework.exceptions import NotFound
+from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.filters import SearchFilter
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 
 from backend import models, serializers
-from backend.permissions import IsAdminOrReadOnly, ShopPermission, IsOwnerPermissions
+from backend.permissions import IsAdminOrReadOnly, ShopPermission, IsBuyer, IsOwnerPermissions
 from backend.services import (get_contacts, get_short_contacts, get_shops, get_shop, get_category, get_products,
-                              get_product_infos, get_products_list, get_orders_list)
-from backend.validators import validate_categories, delete_product_info
+                              get_product_infos, converting_categories_data, converting_products_data,
+                              get_products_list, get_orders_list)
+from backend.validators import validate_categories, delete_product_info, load_yaml_data, get_shop_obj
 
 Salesman = get_user_model()
 
@@ -263,6 +264,63 @@ class ProductInfoView(viewsets.ModelViewSet):
             content += [f'В Категорию `{result['category']}` больше не входит ни один Товар.']
 
         return Response(data={'detail': content}, status=status.HTTP_204_NO_CONTENT)
+
+
+class PartnerUpdate(views.APIView):
+    """ Класс для обновления прайса от поставщика.
+    """
+    permission_classes = [IsBuyer]
+
+    def post(self, request, *args, **kwargs):
+        """ Загружает новый товар.
+        """
+        data = load_yaml_data(request)
+
+        shop_obj = get_shop_obj(request, data['shop'])
+        shop_obj.filename = request.data.get('url')
+        shop_obj.save(update_fields=['filename'])
+        if 'categories' in data.keys():
+            # Выделяет Категории, которых нет, подготавливает данные и сохраняет через сериализатор.
+            categories_data = converting_categories_data(data['categories'])
+            if categories_data:
+                category_ser = serializers.CategorySerializer(data=categories_data, many=True)
+                category_ser.is_valid(raise_exception=True)
+                category_ser.save()
+
+        setattr(self, 'action', 'create')
+        # Подготавливает данные к сохранению Описания товара через сериализатор.
+        products_data = converting_products_data(data['goods'], shop_obj.name)
+        products, all_num, new_num, skip_num, errors = [], len(products_data), 0, 0, {}
+        for prod_data in products_data:
+            # Товары сохраняются в БД по одному.
+            # При ошибке пропустится сохранение только одного, ошибочного, Товара, а не всего пакета.
+            product_ser = serializers.ProductInfoSerializer(data=prod_data, context={'view': self})
+            if product_ser.is_valid():
+                try:
+                    product_ser.save()
+                except ValidationError as e:
+                    errors[f'{prod_data['external_id']}'] = str(e)
+                    skip_num += 1
+                else:
+                    products.append(product_ser.data)
+                    new_num += 1 if product_ser.context.pop('created', False) else 0
+            else:
+                if product_ser.errors['external_id'][0].code == 'unique':
+                    errors[f'{prod_data['external_id']}'] = product_ser.errors['external_id']
+                else:
+                    errors[f'{prod_data['external_id']}'] = product_ser.errors
+                skip_num += 1
+
+        if all_num == 0:
+            return Response(data=[{'detail': ['У этого источника пустой список товаров.']}],
+                            status=status.HTTP_204_NO_CONTENT)
+
+        msg = [f'Получено товаров `{all_num}`', f'Пропущено `{skip_num}`', f'Загружено `{new_num}`']
+        if all_num == skip_num:
+            return Response(data=[{'detail': ['Возможно, этот файл уже загружен.'] + msg}] + [errors],
+                            status=status.HTTP_208_ALREADY_REPORTED)
+
+        return Response(data=[{'detail': ['Загрузка выполнена.'] + msg}] + products, status=status.HTTP_201_CREATED)
 
 
 class PriceView(generics.ListAPIView):
