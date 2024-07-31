@@ -18,7 +18,7 @@ router.register(prefix='shop', viewset=views.ShopView, basename='shop')
 router.register(prefix='category', viewset=views.CategoryView, basename='category')
 router.register(prefix='product', viewset=views.ProductView, basename='product')
 router.register(prefix='prod_info', viewset=views.ProductInfoView, basename='prod_info')
-router.register(prefix='orders', viewset=views.BasketView, basename='orders')
+router.register(prefix='order', viewset=views.OrderView, basename='order')
 
 urlpatterns = [
     # Работает с контактом пользователя.                http://127.0.0.1:8000/api/v1/backend/contact/
@@ -29,5 +29,5 @@ urlpatterns = [
     # Работает с описанием товара.                      http://127.0.0.1:8000/api/v1/backend/prod_info/
     path('upload/', views.PartnerUpdate.as_view(), name='upload'),
     path('price/', views.PriceView.as_view(), name='price'),
-    # Работает с корзиной и общим списком заказов.      http://127.0.0.1:8000/api/v1/backend/orders/
+    # Работает с корзиной и общим списком заказов.      http://127.0.0.1:8000/api/v1/backend/order/
 ] + router.urls

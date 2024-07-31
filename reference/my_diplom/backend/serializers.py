@@ -433,21 +433,34 @@ class PriceSerializer(serializers.ModelSerializer):
 class ShortOrderItemSerializer(serializers.ModelSerializer):
     """ Сериализатор для отображения Товара в сокращённом формате.
     """
-    product = serializers.StringRelatedField(source='product_info', read_only=True)
+    info_id = serializers.CharField(source='product_info.id', read_only=True)
+    product = serializers.StringRelatedField(source='product_info.product', read_only=True)
+    price = serializers.CharField(source='product_info.price_rrc', read_only=True)
+    shop = serializers.StringRelatedField(source='product_info.shop', read_only=True)
 
     class Meta:
         model = models.OrderItem
-        fields = ['product', 'quantity']
+        fields = ['info_id', 'product', 'quantity', 'price', 'shop']
+        read_only_fields = ['quantity']
 
 
-class OrderListSerializer(serializers.ModelSerializer):
-    """ Сериализатор для отображения Списка заказов.
+class OrderSerializer(serializers.ModelSerializer):
+    """ Сериализатор для отображения Заказа.
     """
     state = serializers.CharField(source='get_state_display', read_only=True)
     ordered_items = ShortOrderItemSerializer(read_only=True, many=True)
+    count = serializers.SerializerMethodField(read_only=True)
+    customer = serializers.StringRelatedField(read_only=True)
     contact = ShortContactSerializer(read_only=True)
 
     class Meta:
         model = models.Order
-        fields = ['id', 'state', 'updated_state', 'ordered_items', 'sum', 'contact', 'created_at']
+        fields = ['id', 'state', 'updated_state', 'ordered_items', 'count', 'sum', 'customer', 'contact',
+                  'created_at']
         read_only_fields = ['id', 'updated_state', 'sum', 'created_at']
+
+    @staticmethod
+    def get_count(obj):
+        """ Подсчитывает количество Товаров в Заказе.
+        """
+        return obj.ordered_items.all().count()

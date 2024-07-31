@@ -100,12 +100,3 @@ class IsBuyer(permissions.BasePermission):
                                           or request.user.is_staff or request.user.is_superuser))
 
         return bool(request.user and (request.user.is_staff or request.user.is_superuser))
-
-
-class IsOwnerPermissions(permissions.BasePermission):
-    """ Класс для разрешения на внесение исправлений в объекты только их авторам."""
-
-    def has_object_permission(self, request, view, obj):
-        """ Проверяет клиента на то, что он является автором объекта.
-        """
-        return bool(request.user and request.user == obj.customer)

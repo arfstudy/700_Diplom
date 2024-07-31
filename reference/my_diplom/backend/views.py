@@ -340,22 +340,24 @@ class PriceView(generics.ListAPIView):
         return get_price(self)
 
 
-class BasketView(viewsets.GenericViewSet):
-    """ Класс для работы с корзиной пользователя.
-
-        Methods:
-        - get: Retrieve the items in the user's basket.
-        - post: Add an item to the user's basket.
-        - put: Update the quantity of an item in the user's basket.
-        - delete: Remove an item from the user's basket.
-
-        Attributes:
-        - None
+class OrderView(viewsets.ModelViewSet):
+    """ Класс для просмотра Заказа.
     """
     queryset = models.Order.objects.all()
-    permission_classes = [IsOwnerPermissions]
+    serializer_class = serializers.OrderSerializer
+    permission_classes = [IsAuthenticated]
 
-    def list(self, request, *args, **kwargs):
-        """ Возвращает заказы пользователя, который выполнил запрос.
+    def get_queryset(self):
+        """ Возвращает Пользователю список его Заказов, кроме удалённых.
+            Администраторам доступны Заказы всех Пользователей, в том числе, удалённые.
         """
-        return Response(data=get_orders_list(self, serializers), status=status.HTTP_200_OK)
+        queryset = (self.queryset if self.request.user.is_staff
+                    else self.queryset.exclude(state=models.Order.Status.DELETE).filter(customer=self.request.user))
+
+        pk = int(self.kwargs.get("pk", 0))
+        if pk > 0:
+            queryset = self.queryset.filter(pk=pk)
+            if not queryset:
+                raise NotFound(f'У Вас нет Заказа с id={pk}.')
+
+        return queryset
