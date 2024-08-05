@@ -410,16 +410,24 @@ class ProductInfoSerializer(serializers.ModelSerializer):
 
 
 class PriceSerializer(serializers.ModelSerializer):
-    """ Сериализатор для просмотра прайса товаров.
+    """ Сериализатор для просмотра Прайса товаров.
     """
-    product = ProductSerializer(read_only=True)
-    shop = serializers.StringRelatedField()
-    # product_parameters = ProductParameterSerializer(read_only=True, many=True)  # Назначить правильный сериализатор.
+    product = serializers.StringRelatedField(read_only=True)
+    product_parameters = ParameterAndValueViewSerializer(read_only=True, many=True)
+    category = serializers.StringRelatedField(source='product.category', read_only=True)
+    shop = serializers.StringRelatedField(read_only=True)
 
     class Meta:
         model = models.ProductInfo
-        fields = ['id', 'model', 'catalog_number', 'product', 'shop', 'quantity', 'price_rrc', 'product_parameters']
-        read_only_fields = ['id']
+        fields = ['info_id', 'product', 'model', 'external_id', 'quantity', 'price', 'product_parameters',
+                  'category', 'shop']
+        extra_kwargs = {
+            'info_id': {'source': 'id', 'read_only': True},
+            'model': {'read_only': True},
+            'external_id': {'source': 'catalog_number', 'read_only': True},
+            'quantity': {'read_only': True},
+            'price': {'source': 'price_rrc', 'read_only': True}
+        }
 
 
 class ShortOrderItemSerializer(serializers.ModelSerializer):

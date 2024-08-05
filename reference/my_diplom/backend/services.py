@@ -279,23 +279,48 @@ def converting_products_data(goods_dict, shop_name):
     return content
 
 
-def get_products_list(self):
+def get_price(self):
     """ Возвращает Прайс, список товаров.
-        Регулирует перечень возвращаемых данных в зависимости от запрошенных параметров.
+        Регулирует перечень возвращаемых данных в зависимости от запрошенного магазина и категории.
     """
     query = Q(shop__state=Shop.Worked.OPEN) & Q(quantity__gt=0)
-    shop_id = self.request.GET.get('shop_id')
-    category_id = self.request.GET.get('category_id')
-
-    if shop_id:
-        query = query & Q(shop_id=shop_id)
-
+    category_id = self.request.GET.get('category_id', '')
+    category_number = self.request.GET.get('category_number', '')
+    category_name = self.request.GET.get('category_name', '')
     if category_id:
         query = query & Q(product__category_id=category_id)
+    elif category_number:
+        query = query & Q(product__category__catalog_number=category_number)
+    elif category_name:
+        query = query & Q(product__category__name__icontains=category_name)
+
+    shop_id = self.request.GET.get('shop_id', '')
+    shop_name = self.request.GET.get('shop_name', '')
+    if shop_id:
+        query = query & Q(shop_id=shop_id)
+    elif shop_name:
+        query = query & Q(shop__name__icontains=shop_name)
 
     # Фильтруем и отбрасываем дубликаты.
     queryset = ProductInfo.objects.filter(query).select_related('shop', 'product__category').prefetch_related(
         'product_parameters__parameter').distinct()
+
+    # Сортируем отображение товаров.
+    sort_param = self.request.GET.get('sort', 'id')
+    if sort_param != 'id' and sort_param != '-id':
+        if sort_param == 'name':
+            sort_param = 'product__name'
+        elif sort_param == '-name':
+            sort_param = '-product__name'
+        elif sort_param == 'min_price':
+            sort_param = 'price_rrc'
+        elif sort_param == 'max_price':
+            sort_param = '-price_rrc'
+        else:
+            # Неизвестные параметры сортировки игнорируются. (Можно возвращать ошибку или предупреждение).
+            sort_param = 'id'
+
+    queryset = queryset.order_by(sort_param)
 
     return queryset
 

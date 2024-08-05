@@ -11,7 +11,7 @@ from backend import models, serializers
 from backend.permissions import IsAdminOrReadOnly, ShopPermission, IsBuyer, IsOwnerPermissions
 from backend.services import (get_contacts, get_short_contacts, get_shops, get_shop, get_category, get_products,
                               get_product_infos, converting_categories_data, converting_products_data,
-                              get_products_list, get_orders_list)
+                              get_price, get_orders_list)
 from backend.validators import validate_categories, delete_product_info, load_yaml_data, get_shop_obj
 
 Salesman = get_user_model()
@@ -324,16 +324,20 @@ class PartnerUpdate(views.APIView):
 
 
 class PriceView(generics.ListAPIView):
-    """ Класс для просмотра Списка товаров (прайса) с дополнительными сведениями.
+    """ Класс для просмотра Прайса (списка товаров с дополнительными сведениями).
     """
     queryset = models.ProductInfo.objects.all()
     serializer_class = serializers.PriceSerializer
     permission_classes = [IsAuthenticated]
+    # Находит Товары определённого названия (сочетания символов в названии). Команда: '.../?prod_name=<prod_name>'.
+    search_fields = ['product__name']
+    SearchFilter.search_param = 'prod_name'
 
     def get_queryset(self):
-        """ Изменяет перечень возвращаемых данных с учётом фильтров.
+        """ Изменяет перечень возвращаемых данных с учётом фильтров,
+            сортирует отображение.
         """
-        return get_products_list(self)
+        return get_price(self)
 
 
 class BasketView(viewsets.GenericViewSet):
