@@ -32,4 +32,7 @@ urlpatterns = [
     path(
         'api/v1/apiauth/', include(arg='apiauth.urls', namespace='api')
     ),
+    path(
+        'api/v1/backend/', include(arg='backend.urls', namespace='backend')
+    ),
 ]
