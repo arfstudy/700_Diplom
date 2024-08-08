@@ -69,34 +69,34 @@ class ShortContactSerializer(serializers.ModelSerializer):
 
 
 class ShortShopSerializer(serializers.ModelSerializer):
-    """ Сериализатор для отображения полей магазина в сокращённом виде.
+    """ Сериализатор для отображения Магазина в сокращённом формате.
     """
+    state = serializers.CharField(source='get_state_display', read_only=True)
 
     class Meta:
         model = models.Shop
         fields = ['id', 'name', 'state', 'seller', 'buyer']
-        extra_kwargs = {
-            'id': {'read_only': True},
-            'name': {'read_only': True},
-            'state': {'source': 'get_state_display', 'read_only': True},
-            'seller': {'read_only': True},
-            'buyer': {'read_only': True},
-        }
+        read_only_fields = ['id', 'name', 'seller', 'buyer']
 
 
 class ShopSerializer(serializers.ModelSerializer):
-    """ Сериализатор для отображения и сохранения магазина.
+    """ Сериализатор для создания, отображения и изменения Магазина.
     """
+    user_seller = serializers.StringRelatedField(source='seller', read_only=True)
+    user_buyer = serializers.StringRelatedField(source='buyer', read_only=True)
+    categories = serializers.StringRelatedField(read_only=True, many=True)
 
     class Meta:
         model = models.Shop
-        fields = ['id', 'name', 'condition', 'state', 'filename', 'seller', 'buyer']
+        fields = ['id', 'name', 'condition', 'state', 'filename', 'user_seller', 'user_buyer', 'categories',
+                  'seller', 'buyer']
         extra_kwargs = {
             'id': {'read_only': True},
             'condition': {'source': 'get_state_display', 'read_only': True},
-            'state': {'write_only': True},
-            'seller': {'required': False},
-            'buyer': {'required': False},
+            'state': {'write_only': True, 'required': False},
+            'filename': {'required': False},
+            'seller': {'write_only': True, 'required': False},
+            'buyer': {'write_only': True, 'required': False},
         }
 
     def to_internal_value(self, validated_data):

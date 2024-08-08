@@ -45,6 +45,31 @@ def get_short_contacts(salesman, serializers_modul):
             'contacts': [e[k] for e in contacts_serializer.data for k in e.keys()]}
 
 
+def get_shops(shop_view):
+    """ Возвращает список магазинов в зависимости от запроса.
+    """
+    queryset = shop_view.queryset.filter(state=Shop.Worked.OPEN)
+    if 'shop' in shop_view.request.GET.keys():
+        if shop_view.request.GET['shop'] == 'all':
+            queryset = shop_view.queryset
+        elif shop_view.request.GET['shop'] == 'close':
+            queryset = shop_view.queryset.filter(state=Shop.Worked.CLOSE)
+
+    category_id = shop_view.request.GET.get('category_id', '')
+    category_number = shop_view.request.GET.get('category_number', '')
+    category_name = shop_view.request.GET.get('category_name', '')
+    if category_id:
+        return queryset.filter(categories__id=category_id)
+
+    if category_number:
+        return queryset.filter(categories__catalog_number=category_number)
+
+    if category_name:
+        return queryset.filter(categories__name__icontains=category_name)
+
+    return queryset
+
+
 def join_choice_errors(errors, choice_errors):
     """ Объединяет тексты ошибок Choice-полей.
     """
@@ -87,21 +112,6 @@ def is_not_salesman(obj_ser, salesman):
                 raise ValidationError(msg)
 
     return salesman
-
-
-def get_list_shops(shop_view, serializers_modul):
-    """ Возвращает список магазинов в сокращённом виде.
-    """
-    queryset = shop_view.queryset
-    if 'state' in shop_view.request.GET.keys():
-        if shop_view.request.GET['state'] == 'open':
-            queryset = queryset.filter(state=Shop.Worked.OPEN)
-        elif shop_view.request.GET['state'] == 'close':
-            queryset = queryset.filter(state=Shop.Worked.CLOSE)
-
-    shop_serializer = serializers_modul.ShortShopSerializer(instance=queryset, many=True)
-    return {'shops': [[f"{e['id']}: {e['name']}, state={e['state']}, seller={e['seller']}, buyer={e['buyer']}"]
-                  for e in shop_serializer.data]}
 
 
 def get_products_list(self):

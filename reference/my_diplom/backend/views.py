@@ -1,12 +1,12 @@
 from django.contrib.auth import get_user_model
 from rest_framework import viewsets, status, generics
 from rest_framework.decorators import action
-from rest_framework.exceptions import NotFound, MethodNotAllowed
+from rest_framework.exceptions import NotFound
 from rest_framework.response import Response
 
 from backend import models, serializers
-from backend.permissions import IsAdminOrReadOnly, ShopPermissions, IsAuthenticatedPermissions, IsOwnerPermissions
-from backend.services import get_contacts, get_short_contacts, get_list_shops, get_products_list, get_orders_list
+from backend.permissions import IsAdminOrReadOnly, IsAuthenticatedPermissions, IsOwnerPermissions
+from backend.services import get_contacts, get_short_contacts, get_shops, get_products_list, get_orders_list
 
 Salesman = get_user_model()
 
@@ -54,26 +54,60 @@ class ContactsListView(viewsets.GenericViewSet):
 
 
 class ShopView(viewsets.ModelViewSet):
-    """ Класс для работы с моделью магазина.
+    """ Класс для создания, просмотра, изменения и удаления Магазина.
     """
     queryset = models.Shop.objects.all()
     serializer_class = serializers.ShopSerializer
-    permission_classes = [ShopPermissions]
+
+    def get_queryset(self):
+        """ Изменяет перечень возвращаемых данных.
+        """
+        return get_shops(self)
+
+    @staticmethod
+    def short_shop(shop):
+        """ Отображает только часть полей магазина, и в компактном виде.
+        """
+        return [f"{shop['id']}: {shop['name']}, state={shop['state']}, seller={shop['seller']}, buyer={shop['buyer']}"]
 
     def list(self, request, *args, **kwargs):
-        """ Возвращает список магазинов в сокращённом виде.
+        """ Возвращает список магазинов.
         """
-        return Response(data=get_list_shops(self, serializers), status=status.HTTP_200_OK)
+        kwargs['many'] = True
+        content = self.retrieve(request, *args, **kwargs)
+        page = self.paginate_queryset(content)
+        if page is not None:
+            return self.get_paginated_response(data=page)
+
+        return Response(data={'shops': content}, status=status.HTTP_200_OK)
+
+    def retrieve(self, request, *args, **kwargs):
+        """ Возвращает один магазин или несколько, со всеми полями или в сокращённом виде.
+        """
+        is_many = kwargs.get('many', False)
+        instance = self.get_queryset() if is_many else self.get_object()
+        if self.request.user.is_staff:
+            # Возвращает все поля магазина.
+            shop_ser = serializers.ShopSerializer(instance=instance, many=is_many)
+            if is_many:
+                return shop_ser.data
+
+            return Response(data=shop_ser.data, status=status.HTTP_200_OK)
+
+        # Возвращает в сокращённом виде.
+        shop_ser = serializers.ShortShopSerializer(instance=instance, many=is_many)
+        if is_many:
+            return [self.short_shop(e) for e in shop_ser.data]
+
+        return Response(data={'shop': self.short_shop(shop_ser.data)}, status=status.HTTP_200_OK)
 
     def destroy(self, request, *args, **kwargs):
         """ Удаляет магазин.
         """
         pk = kwargs.get('pk', None)
-        if not pk:
-            raise MethodNotAllowed('Удаление не возможно.')
         try:
             shop = models.Shop.objects.get(pk=pk)
-        except:
+        except models.Shop.DoesNotExist:
             raise NotFound(f'Магазин с id={pk} не найден.')
 
         shop.delete()
