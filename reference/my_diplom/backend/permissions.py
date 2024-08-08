@@ -1,6 +1,21 @@
 from rest_framework import permissions
 
 
+class IsAdminOrReadOnly(permissions.BasePermission):
+    """ Класс для разрешения на просмотр всем авторизованным.
+    """
+
+    def has_permission(self, request, view):
+        """ Проверяет клиента на то, что он является авторизованным или администратором.
+        """
+        if view.action in ['list', 'retrieve', 'head', 'options']:
+            # Если полученный метод только на чтение, "безопасный", то права доступа предоставляются авторизованным.
+            return bool(request.user and request.user.is_authenticated)
+
+        # Иначе права доступа предоставляются администраторам или суперпользователям.
+        return bool(request.user and (request.user.is_staff or request.user.is_superuser))
+
+
 class ShopPermissions(permissions.BasePermission):
     """ Класс для разрешения на создание и удаление магазинов только администраторам или суперпользователям.
         Просмотр списка магазинов, изменение отдельных полей всем авторизованным.

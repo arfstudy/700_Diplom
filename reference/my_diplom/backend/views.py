@@ -1,18 +1,18 @@
 from django.contrib.auth import get_user_model
 from rest_framework import viewsets, status, generics
 from rest_framework.decorators import action
-from rest_framework.exceptions import NotFound, MethodNotAllowed, ValidationError
+from rest_framework.exceptions import NotFound, MethodNotAllowed
 from rest_framework.response import Response
 
 from backend import models, serializers
-from backend.permissions import ShopPermissions, IsAuthenticatedPermissions, IsOwnerPermissions
-from backend.services import get_contacts, get_salesman_contacts, get_list_shops, get_products_list, get_orders_list
+from backend.permissions import IsAdminOrReadOnly, ShopPermissions, IsAuthenticatedPermissions, IsOwnerPermissions
+from backend.services import get_contacts, get_short_contacts, get_list_shops, get_products_list, get_orders_list
 
 Salesman = get_user_model()
 
 
 class ContactModelView(viewsets.ModelViewSet):
-    """ Класс для создания, просмотра, изменения и удаления контакта пользователя.
+    """ Класс для создания, просмотра, изменения и удаления Контакта пользователя.
     """
     serializer_class = serializers.ContactSerializer
 
@@ -24,30 +24,33 @@ class ContactModelView(viewsets.ModelViewSet):
 
 
 class ContactsListView(viewsets.GenericViewSet):
-    """ Класс для просмотра контактов пользователя в сокращённом виде.
+    """ Класс для просмотра Контактов пользователя в сокращённом виде.
     """
+    permission_classes = [IsAdminOrReadOnly]
 
     @staticmethod
     def list(request):
-        """ Возвращает контакты пользователя, который выполнил запрос.
+        """ Возвращает Контакты пользователя, который выполнил запрос.
         """
-        return Response(data=get_salesman_contacts(request.user, serializers), status=status.HTTP_200_OK)
+        return Response(data=get_short_contacts(request.user, serializers), status=status.HTTP_200_OK)
 
     @action(methods=['get'], detail=False, url_path='all')
-    def contacts_all_salesmans(self, request):
-        """ Примечание: Только для администраторов и суперпользователей.
-            Возвращает контакты всех пользователей
+    def salesmans_all_contacts(self, request):
+        """ Возвращает контакты всех пользователей
             по запросу: GET 'http://127.0.0.1:8000/api/v1/backend/short_contacts/all/'.
+            Примечание: Только для администраторов и суперпользователей.
         """
-        if bool(request.user and (request.user.is_staff or request.user.is_superuser)):
-            salesmans_list = []
-            for salesman in Salesman.objects.all().prefetch_related('contacts'):
-                res = get_salesman_contacts(salesman, serializers)
-                res['salesman'] += f', is_active={salesman.is_active}'
-                salesmans_list.append(res)
-            return Response(data=salesmans_list, status=status.HTTP_200_OK)
+        salesmans_list = []
+        for salesman in Salesman.objects.all().prefetch_related('contacts'):
+            res = get_short_contacts(salesman, serializers)
+            res['salesman'] += f', is_active={salesman.is_active}'
+            salesmans_list.append(res)
 
-        raise NotFound('Page not found.')
+        page = self.paginate_queryset(salesmans_list)
+        if page is not None:
+            return self.get_paginated_response(data=page)
+
+        return Response(data=salesmans_list, status=status.HTTP_200_OK)
 
 
 class ShopView(viewsets.ModelViewSet):

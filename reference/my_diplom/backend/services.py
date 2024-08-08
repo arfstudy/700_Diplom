@@ -35,13 +35,13 @@ def get_transmitted_obj(obj_ser, obj_fields):
     return action, obj
 
 
-def get_salesman_contacts(salesman, serializers_modul):
+def get_short_contacts(salesman, serializers_modul):
     """ Возвращает контакты пользователя из БД и отображает в сокращённом виде.
     """
     salesman_serializer = serializers_modul.ShortSalesmanSerializer(instance=salesman)
     contacts = salesman.contacts.all()
     contacts_serializer = serializers_modul.ShortContactSerializer(instance=contacts, many=True)
-    return {'salesman': salesman_serializer.data['salesman'],
+    return {'customer': salesman_serializer.data['customer'],
             'contacts': [e[k] for e in contacts_serializer.data for k in e.keys()]}
 
 

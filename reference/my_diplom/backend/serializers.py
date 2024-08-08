@@ -12,14 +12,14 @@ Salesman = get_user_model()
 
 
 class ContactSerializer(serializers.ModelSerializer):
-    """ Сериализатор для отображения и сохранения отдельного контакта пользователя.
+    """ Сериализатор для создания, отображения и изменения Контакта покупателя.
     """
-    salesman_id = serializers.CharField(source='salesman.id', read_only=True)
+    user = serializers.StringRelatedField(source='salesman', read_only=True)
     salesman = serializers.HiddenField(default=serializers.CurrentUserDefault())
 
     class Meta:
         model = models.Contact
-        fields = ['id', 'city', 'street', 'house', 'structure', 'building', 'apartment', 'phone', 'salesman_id',
+        fields = ['id', 'city', 'street', 'house', 'structure', 'building', 'apartment', 'phone', 'user',
                   'salesman']
         read_only_fields = ['id']
 
@@ -27,7 +27,7 @@ class ContactSerializer(serializers.ModelSerializer):
         """ Добавляет собственные проверки: наличие обязательных полей, присутствие реальных изменений,
             отсеивание неликвидных полей, (проверка и подготовка choice-параметров модели 'Contact' лишняя).
         """
-        # Проверяем полученных поля на корректность.
+        # Проверяем полученные поля на корректность.
         required_fields = {'city', 'street', 'house'}
         additional_fields = {'structure', 'building', 'apartment', 'phone'}
         action, obj = get_transmitted_obj(self, required_fields)
@@ -49,17 +49,17 @@ class ContactSerializer(serializers.ModelSerializer):
 
 
 class ShortSalesmanSerializer(serializers.ModelSerializer):
-    """ Сериализатор для отображения продавца в сокращённом формате.
+    """ Сериализатор для отображения Покупателя в сокращённом формате.
     """
-    salesman = serializers.CharField(source='__str__', read_only=True)
+    customer = serializers.CharField(source='__str__', read_only=True)
 
     class Meta:
         model = Salesman
-        fields = ['salesman']
+        fields = ['customer']
 
 
 class ShortContactSerializer(serializers.ModelSerializer):
-    """ Сериализатор для отображения контакта в сокращённом формате.
+    """ Сериализатор для отображения Контакта в сокращённом формате.
     """
     contact = serializers.CharField(source='get_short_contact', read_only=True)
 
