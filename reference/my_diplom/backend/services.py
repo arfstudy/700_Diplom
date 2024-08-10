@@ -46,8 +46,14 @@ def get_short_contacts(salesman, serializers_modul):
 
 
 def get_shops(shop_view):
-    """ Возвращает список магазинов в зависимости от запроса.
+    """ Возвращает магазины в зависимости от запроса.
     """
+    if 'pk' in shop_view.kwargs.keys():
+        queryset = shop_view.queryset.filter(pk=shop_view.kwargs['pk'])
+        if not queryset:
+            raise NotFound(f'Магазин с id={shop_view.kwargs['pk']} не найден.')
+        return queryset
+
     queryset = shop_view.queryset.filter(state=Shop.Worked.OPEN)
     if 'shop' in shop_view.request.GET.keys():
         if shop_view.request.GET['shop'] == 'all':
@@ -68,6 +74,23 @@ def get_shops(shop_view):
         return queryset.filter(categories__name__icontains=category_name)
 
     return queryset
+
+
+def get_shop(param):
+    """ Возвращает объект магазина по ключам 'pk' или 'name'.
+    """
+    try:
+        shop = Shop.objects.get(pk=param)
+    except (TypeError, ValueError, OverflowError, Shop.DoesNotExist, ValidationError):
+        pass
+    else:
+        return shop
+    try:
+        shop = Shop.objects.get(name=param)
+    except (TypeError, ValueError, OverflowError, Shop.DoesNotExist, ValidationError):
+        return None
+
+    return shop
 
 
 def join_choice_errors(errors, choice_errors):
@@ -93,25 +116,6 @@ def replace_salesmans_errors(errors, res):
             if errors[field][0].startswith('Недопустимый пер') and errors[field][0].endswith('т не существует.'):
                 errors[field] = [f'Пользователь с id={res[field]} не найден.']
     return
-
-
-def is_not_salesman(obj_ser, salesman):
-    """ Проверяет, что пользователь активен и не является менеджером какого-нибудь магазина.
-    """
-    if salesman:
-        if not salesman.is_active:
-            raise ValidationError(f'Пользователь с id={salesman.id} был удалён. Обратитесь к администратору сайта.')
-
-        msg = f'Пользователь с id={salesman.id} уже является Менеджером одного из магазинов.'
-        if obj_ser.context['view'].action == 'create':
-            if bool(salesman and Shop.objects.filter(Q(buyer=salesman) | Q(seller=salesman)).exists()):
-                raise ValidationError(msg)
-
-        elif obj_ser.context['view'].action in ['update', 'partial_update']:
-            if Shop.objects.exclude(id=obj_ser.instance.id).filter(Q(buyer=salesman) | Q(seller=salesman)).exists():
-                raise ValidationError(msg)
-
-    return salesman
 
 
 def get_products_list(self):

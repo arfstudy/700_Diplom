@@ -1,11 +1,11 @@
 from django.contrib.auth import get_user_model
 from rest_framework import viewsets, status, generics
 from rest_framework.decorators import action
-from rest_framework.exceptions import NotFound
+from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 
 from backend import models, serializers
-from backend.permissions import IsAdminOrReadOnly, IsAuthenticatedPermissions, IsOwnerPermissions
+from backend.permissions import IsAdminOrReadOnly, ShopPermission, IsAuthenticatedPermissions, IsOwnerPermissions
 from backend.services import get_contacts, get_short_contacts, get_shops, get_products_list, get_orders_list
 
 Salesman = get_user_model()
@@ -64,6 +64,20 @@ class ShopView(viewsets.ModelViewSet):
         """
         return get_shops(self)
 
+    def get_permissions(self):
+        """ Определяет разрешения в зависимости от действий.
+        """
+        # Просматривать могут авторизованные пользователи.
+        if self.action in ['list', 'retrieve']:
+            return [IsAuthenticated()]
+
+        # Обновлять определённые поля могут определённые категории пользователей.
+        if self.action == 'partial_update':
+            return [ShopPermission()]
+
+        # Остальные действия разрешены только администраторам.
+        return [IsAdminUser()]
+
     @staticmethod
     def short_shop(shop):
         """ Отображает только часть полей магазина, и в компактном виде.
@@ -94,7 +108,7 @@ class ShopView(viewsets.ModelViewSet):
 
             return Response(data=shop_ser.data, status=status.HTTP_200_OK)
 
-        # Возвращает в сокращённом виде.
+        # Возвращает магазин в сокращённом виде.
         shop_ser = serializers.ShortShopSerializer(instance=instance, many=is_many)
         if is_many:
             return [self.short_shop(e) for e in shop_ser.data]
@@ -105,13 +119,9 @@ class ShopView(viewsets.ModelViewSet):
         """ Удаляет магазин.
         """
         pk = kwargs.get('pk', None)
-        try:
-            shop = models.Shop.objects.get(pk=pk)
-        except models.Shop.DoesNotExist:
-            raise NotFound(f'Магазин с id={pk} не найден.')
-
+        shop = self.get_object()
         shop.delete()
-        return Response(data={'detail': f'Магазин с id={pk} удалён.'}, status=status.HTTP_204_NO_CONTENT)
+        return Response(data={'detail': [f'Магазин с id={pk} удалён.']}, status=status.HTTP_204_NO_CONTENT)
 
 
 class CategoryView(generics.ListAPIView):

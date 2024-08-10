@@ -5,8 +5,8 @@ from rest_framework.exceptions import ValidationError
 from apiauth.validators import pre_check_incoming_fields
 from backend import models
 from backend.forms import ContactHasDiffForm, ShopHasDiffForm
-from backend.services import get_transmitted_obj, join_choice_errors, replace_salesmans_errors, is_not_salesman
-from backend.validators import is_permission_updated
+from backend.services import get_transmitted_obj, join_choice_errors, replace_salesmans_errors
+from backend.validators import is_not_salesman, is_permission_updated
 
 Salesman = get_user_model()
 
