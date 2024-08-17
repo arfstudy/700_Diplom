@@ -6,7 +6,7 @@ from apiauth.validators import pre_check_incoming_fields
 from backend import models
 from backend.forms import ContactHasDiffForm, ShopHasDiffForm
 from backend.services import get_transmitted_obj, join_choice_errors, replace_salesmans_errors, is_not_salesman
-from backend.validators import to_internal_value_after_pre_check, is_permission_updated
+from backend.validators import is_permission_updated
 
 Salesman = get_user_model()
 
@@ -25,7 +25,7 @@ class ContactSerializer(serializers.ModelSerializer):
 
     def to_internal_value(self, validated_data):
         """ Добавляет собственные проверки: наличие обязательных полей, присутствие реальных изменений,
-            отсеивание неликвидных полей, проверка и подготовка choice-параметров.
+            отсеивание неликвидных полей, (проверка и подготовка choice-параметров модели 'Contact' лишняя).
         """
         # Проверяем полученных поля на корректность.
         required_fields = {'city', 'street', 'house'}
@@ -38,10 +38,11 @@ class ContactSerializer(serializers.ModelSerializer):
                         if action in ['update', 'partial_update'] else {})
             raise ValidationError(detail={**errors, **warning, **instance, **invalid_fields})
 
-        # Проверяем полученных поля на корректность значений.
-        ret, errors = to_internal_value_after_pre_check(self, res)
-
-        if errors:
+        # Встроенная проверка Django полученных полей на корректность.
+        try:
+            ret = super().to_internal_value(res)
+        except ValidationError as e:
+            errors = {k: [str(v[0])] for k, v in e.detail.items()}
             raise ValidationError(detail={**errors, **invalid_fields})
 
         return ret
@@ -113,10 +114,11 @@ class ShopSerializer(serializers.ModelSerializer):
                         if action in ['update', 'partial_update'] else {})
             raise ValidationError(detail={**errors, **warning, **instance, **invalid_fields})
 
-        # Проверяем переданные поля на корректность значений.
-        ret, errors = to_internal_value_after_pre_check(self, res)
-
-        if errors:
+        # Встроенная проверка Django полученных полей на корректность.
+        try:
+            ret = super().to_internal_value(res)
+        except ValidationError as e:
+            errors = {k: [str(v[0])] for k, v in e.detail.items()}
             if choice_errors:
                 join_choice_errors(errors, choice_errors)
             if 'seller' in errors.keys() or 'buyer' in errors.keys():
