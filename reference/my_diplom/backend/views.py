@@ -10,6 +10,7 @@ from backend import models, serializers
 from backend.permissions import IsAdminOrReadOnly, ShopPermission, IsOwnerPermissions
 from backend.services import (get_contacts, get_short_contacts, get_shops, get_shop, get_category, get_products_list,
                               get_orders_list)
+from backend.validators import validate_categories
 
 Salesman = get_user_model()
 
@@ -125,6 +126,41 @@ class ShopView(viewsets.ModelViewSet):
         shop = self.get_object()
         shop.delete()
         return Response(data={'detail': [f'Магазин с id={pk} удалён.']}, status=status.HTTP_204_NO_CONTENT)
+
+    @action(methods=['patch'], detail=True, url_path='drop_category')
+    def drop_category(self, request, pk):
+        """ Отвязывает указанные категории от магазина
+            по запросу: PATCH 'http://127.0.0.1:8000/api/v1/backend/shop/<pk>/drop_category/'.
+            Ключ 'category_ids' со списком отвязываемых категорий передаются в теле запроса 'body'.
+        """
+        shop = self.get_object()
+        # Находим подходящие категории.
+        categories, errors_msg = validate_categories(request, shop)
+        yes_remove, not_remove, content, state = [], [], dict(), status.HTTP_200_OK
+        if categories:
+            for category in categories:
+                # Проверяет, что в Магазине нет Товаров выбранной Категории.
+                if models.Product.objects.filter(category=category, product_infos__shop=shop).exists():
+                    not_remove.append(category)
+                else:
+                    yes_remove.append(category)
+
+            if yes_remove:
+                shop.categories.remove(*yes_remove)
+                content = {**content, 'Из этого Магазина удалены Категории': [str(c) for c in yes_remove]}
+
+            if not_remove:
+                content = {**content,
+                           'Из этого Магазина нельзя удалить Категории, так как у них есть зависимые Товары.':
+                               [str(c) for c in not_remove]}
+        else:
+            content = {'error': 'Нету категорий, которые можно удалить.'}
+            state = status.HTTP_400_BAD_REQUEST
+
+        if errors_msg:
+            content = {**content, 'not_found_categories': errors_msg}
+
+        return Response(data={**content, 'shop': serializers.ShopSerializer(instance=shop).data}, status=state)
 
 
 class CategoryView(viewsets.ModelViewSet):

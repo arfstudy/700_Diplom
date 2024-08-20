@@ -1,14 +1,14 @@
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from rest_framework import serializers
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import ValidationError, NotFound
 
 from apiauth.validators import pre_check_incoming_fields
 from backend import models
 from backend.forms import ContactHasDiffForm, ShopHasDiffForm
 from backend.services import (get_transmitted_obj, join_choice_errors, replace_salesmans_errors,
-                              get_category_by_name_and_catalog_number)
-from backend.validators import is_not_salesman, is_permission_updated, is_validate_exists_shop
+                              get_category_by_name_and_catalog_number, get_category)
+from backend.validators import is_not_salesman, is_permission_updated, is_validate_exists
 
 Salesman = get_user_model()
 
@@ -91,7 +91,7 @@ class ShopSerializer(serializers.ModelSerializer):
     class Meta:
         model = models.Shop
         fields = ['id', 'name', 'condition', 'state', 'filename', 'user_seller', 'user_buyer', 'categories',
-                  'seller', 'buyer']
+                  'seller', 'buyer', 'category_ids']
         extra_kwargs = {
             'id': {'read_only': True},
             'condition': {'source': 'get_state_display', 'read_only': True},
@@ -99,19 +99,30 @@ class ShopSerializer(serializers.ModelSerializer):
             'filename': {'required': False},
             'seller': {'write_only': True, 'required': False},
             'buyer': {'write_only': True, 'required': False},
+            'category_ids': {'source': 'categories', 'required': False, 'write_only': True, 'many': True}
         }
 
     def to_internal_value(self, validated_data):
         """ Добавляет собственные проверки: наличие обязательных полей, присутствие реальных изменений,
             отсеивание неликвидных полей, проверка и подготовка choice-параметров.
         """
+        # Проверяет категории на существующие и несуществующие, очищает от повторяющихся.
+        errors_msg, categories, ret = [], [], {}
+        if 'category_ids' in validated_data.keys():
+            is_exists, errors_msg = is_validate_exists(validated_data, 'category_ids', models.Category,
+                                                       'Категория')
+            if not is_exists:
+                raise NotFound(detail={'categories': errors_msg})
+            category_ids = validated_data.pop('category_ids')
+            categories = [get_category(c) for c in category_ids]
+
         # Предварительная проверка полученных полей.
         required_fields = {'name'}
         additional_fields = {'state', 'filename', 'seller', 'buyer'}
         action, obj = get_transmitted_obj(self, required_fields)
         res, errors, choice_errors, warning, invalid_fields = pre_check_incoming_fields(validated_data, required_fields,
                                                 additional_fields, action, obj, ShopHasDiffForm, 'магазина')
-        if errors:
+        if errors and not (errors['errors'][0].startswith('Вы не передали ничего нового') and categories):
             instance = ({'shop': ShopSerializer(instance=obj).data}
                         if action in ['update', 'partial_update'] else {})
             raise ValidationError(detail={**errors, **warning, **instance, **invalid_fields})
@@ -125,8 +136,12 @@ class ShopSerializer(serializers.ModelSerializer):
                 join_choice_errors(errors, choice_errors)
             if 'seller' in errors.keys() or 'buyer' in errors.keys():
                 replace_salesmans_errors(errors, res)
+            if errors_msg:
+                errors = {**errors, 'categories': errors_msg}
             raise ValidationError(detail={**errors, **invalid_fields})
 
+        if categories:
+            ret['categories'] = categories
         return ret
 
     def validate_seller(self, value):
@@ -151,6 +166,22 @@ class ShopSerializer(serializers.ModelSerializer):
 
         return attrs
 
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        """ Вносит изменения в Магазин.
+            Связи с новыми категориями добавляются к старым, а не замещают их.
+        """
+        instance.name = validated_data.get('name', instance.name)
+        instance.state = validated_data.get('state', instance.state)
+        instance.filename = validated_data.get('filename', instance.filename)
+        instance.seller = validated_data.get('seller', instance.seller)
+        instance.buyer = validated_data.get('buyer', instance.buyer)
+        categories = validated_data.pop('categories', [])
+        if categories:
+            instance.categories.add(*categories)
+        instance.save()
+        return instance
+
 
 class CategorySerializer(serializers.ModelSerializer):
     """ Сериализатор для создания, отображения и изменения Категории товара.
@@ -171,9 +202,9 @@ class CategorySerializer(serializers.ModelSerializer):
         # Проверяет магазины на существующие и несуществующие, очищает от повторяющихся.
         errors_msg = ''
         if 'shops' in validated_data.keys() and validated_data['shop']:
-            is_exists, errors_msg = is_validate_exists_shop(validated_data)
+            is_exists, errors_msg = is_validate_exists(validated_data, 'shops', models.Shop, 'Магазин')
             if not is_exists:
-                raise ValidationError(detail={'shops': errors_msg})
+                raise NotFound(detail={'shops': errors_msg})
 
         if not self.instance:
             # Получает Категорию, если она существует.

@@ -30,6 +30,11 @@ class ShopPermission(permissions.BasePermission):
         if view.action == 'partial_update' and bool(request.user):
             is_staff = request.user.is_staff
             is_super = request.user.is_superuser
+            if 'category_ids' in request.data.keys():
+                # Поле 'category_ids' можно менять только администратору.
+                self.message = 'Ваш статус не подходит для изменения поля `category_ids`.'
+                return is_staff or is_super
+
             if 'name' in request.data.keys():
                 # Поле 'name' можно менять только администратору.
                 self.message = 'Ваш статус не подходит для изменения поля `name`.'

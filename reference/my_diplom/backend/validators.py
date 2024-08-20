@@ -1,7 +1,8 @@
 from django.db.models import Q
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
-from backend.models import Shop
+from backend.models import Shop, Category
+from backend.services import get_category
 
 
 def is_not_salesman(obj_ser, salesman):
@@ -84,18 +85,35 @@ def not_salesman(user):
     return True
 
 
-def is_validate_exists_shop(validated_data):
-    """ Проверяет существование хотя бы одного магазина.
-        Удаляет дублирующие магазины.
+def is_validate_exists(validated_data, param, obl_class, obj_name):
+    """ Проверяет существование хотя бы одного объекта.
+        Удаляет дублирующиеся.
     """
-    errors_msg, shops_list, flag = [], [], False
-    shops = set(validated_data.pop('shops', []))    # Отсеивает дублирование.
-    for shop_id in shops:
-        if Shop.objects.filter(id=shop_id).exists():
-            shops_list.append(shop_id)
+    errors_msg, objs_list, flag = [], [], False
+    objs = set(validated_data.pop(param, []))    # Отсеивает дублирование.
+    for obj_id in objs:
+        if obl_class.objects.filter(id=obj_id).exists():
+            objs_list.append(obj_id)
             flag = True
         else:
-            errors_msg.append(f'Магазин с id={shop_id} не существует.')
+            errors_msg.append(f'{obj_name} с id={obj_id} не существует.')
 
-    validated_data['shops'] = shops_list if flag else list(shops)
+    validated_data[param] = objs_list if flag else list(objs)
     return flag, errors_msg
+
+
+def validate_categories(request, shop):
+    """ Проверяет категории на существующие и принадлежащие магазину.
+    """
+    category_ids = request.data.get('category_ids', [])
+    if not category_ids:
+        raise ValidationError(detail={'category_ids': 'Вы не передали ни одной категории.'})
+
+    # Выделяем существующие категории.
+    data = {'category_ids': category_ids}
+    is_exists, errors_msg = is_validate_exists(data, 'category_ids', Category, 'Категория')
+    if is_exists:
+        # Выделяем имеющиеся в магазине категории.
+        return [get_category(c) for c in data['category_ids'] if shop.categories.filter(id=c).exists()], errors_msg
+
+    return [], errors_msg
