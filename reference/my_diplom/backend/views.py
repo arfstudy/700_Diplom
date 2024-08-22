@@ -238,12 +238,20 @@ class ProductView(viewsets.ModelViewSet):
         return Response(data={'detail': [f'Товар с id={pk} удалён.']}, status=status.HTTP_204_NO_CONTENT)
 
 
-class ProductInfoView(generics.ListAPIView):
-    """ Класс для просмотра списка товаров (прайса) с дополнительными сведениями.
+class ProductInfoView(viewsets.ModelViewSet):
+    """ Класс для создания и просмотра Описания товара.
     """
     queryset = models.ProductInfo.objects.all()
     serializer_class = serializers.ProductInfoSerializer
-    permission_classes = [IsAdminOrReadOnly]
+    permission_classes = [IsAdminUser]
+
+
+class PriceView(generics.ListAPIView):
+    """ Класс для просмотра Списка товаров (прайса) с дополнительными сведениями.
+    """
+    queryset = models.ProductInfo.objects.all()
+    serializer_class = serializers.PriceSerializer
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         """ Изменяет перечень возвращаемых данных с учётом фильтров.

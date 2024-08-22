@@ -4,7 +4,7 @@ from django.db.models import Q
 from rest_framework.exceptions import NotFound, ValidationError
 
 from apiauth.services import verify_choices
-from backend.models import Contact, Shop, ProductInfo, Order, Category
+from backend.models import Contact, Shop, ProductInfo, Order, Category, Parameter
 
 Salesman = get_user_model()
 
@@ -207,6 +207,12 @@ def get_products(product_view):
         return queryset.filter(product_infos__shop__name__icontains=shop_name)
 
     return queryset
+
+
+def get_or_create_parameter(name):
+    """ Возвращает объект Параметра товара (название характеристики) взамен его имени.
+    """
+    return Parameter.objects.get_or_create(name=name)
 
 
 def get_products_list(self):

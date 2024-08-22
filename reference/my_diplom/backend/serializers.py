@@ -7,8 +7,10 @@ from apiauth.validators import pre_check_incoming_fields
 from backend import models
 from backend.forms import ContactHasDiffForm, ShopHasDiffForm
 from backend.services import (get_transmitted_obj, join_choice_errors, replace_salesmans_errors,
-                              get_category_by_name_and_catalog_number, get_category, get_category_by_catalog_number)
-from backend.validators import is_not_salesman, is_permission_updated, is_validate_exists
+                              get_category_by_name_and_catalog_number, get_category, get_category_by_catalog_number,
+                              get_shop, get_or_create_parameter)
+from backend.validators import (is_not_salesman, is_permission_updated, is_validate_exists,
+                                get_or_create_product_with_category)
 
 Salesman = get_user_model()
 
@@ -298,22 +300,95 @@ class ProductSerializer(serializers.ModelSerializer):
         return instance
 
 
-class ProductParameterSerializer(serializers.ModelSerializer):
-    """ Сериализатор для отображения и сохранения характеристик товара.
+class ParameterAndValueViewSerializer(serializers.ModelSerializer):
+    """ Сериализатор для создания и отображения Названия характеристики и его Значения.
     """
-    parameter = serializers.StringRelatedField()
+    parameter = serializers.CharField(source='parameter.name')
 
     class Meta:
         model = models.ProductParameter
         fields = ['parameter', 'value']
 
+    def validate_value(self, value):
+        """ Проверяет поле 'value' на наличие содержимого.
+        """
+        if self.context['view'].action == 'create' and not value:
+            raise ValidationError(detail=['Это поле не может иметь пустое значение `null` или пустую строку ``.'])
+
+        return value
+
+    def validate(self, attrs):
+        """ Проверяет обязательное присутствие поля 'value'.
+            Присутствие поля 'parameter' проверяется в 'to_internal_value()'.
+        """
+        if 'value' not in attrs.keys():
+            raise ValidationError(detail={'value': ['Обязательное поле.']})
+
+        return attrs
+
 
 class ProductInfoSerializer(serializers.ModelSerializer):
-    """ Сериализатор для отображения и сохранения дополнительных сведений товара.
+    """ Сериализатор для создания и отображения Описания товара.
+    """
+    product = serializers.StringRelatedField(read_only=True)
+    name = serializers.CharField(source='product.name', write_only=True)
+    product_parameters = ParameterAndValueViewSerializer(required=False, many=True)
+    category_number = serializers.CharField(source='product.category.catalog_number', write_only=True)
+    category = serializers.StringRelatedField(source='product.category', read_only=True)
+    shop_name = serializers.CharField(source='shop.name', write_only=True)
+    shop = serializers.StringRelatedField(read_only=True)
+
+    class Meta:
+        model = models.ProductInfo
+        fields = ['info_id', 'product', 'name', 'model', 'external_id', 'quantity', 'price', 'price_rrc',
+                  'product_parameters', 'category_number', 'category', 'shop_name', 'shop']
+        extra_kwargs = {
+            'info_id': {'source': 'id', 'read_only': True},
+            'external_id': {'source': 'catalog_number'}
+        }
+
+    @staticmethod
+    def validate_shop_name(value):
+        """ Проверяет, что существует магазин с заданным названием.
+        """
+        if not models.Shop.objects.filter(name=value).exists():
+            raise NotFound(f'Магазин с таким названием `{value}` не существует.')
+
+        return value
+
+    @staticmethod
+    def validate_category_number(value):
+        """ Проверяет, что существует категория с заданным номером.
+        """
+        if not models.Category.objects.filter(catalog_number=value).exists():
+            raise NotFound(f'Категория с номером по каталогу catalog_number={value} не существует.')
+
+        return value
+
+    @transaction.atomic
+    def create(self, validated_data):
+        """ Создаёт новое Описание.
+        """
+        validated_data['shop'] = get_shop(param=validated_data['shop']['name'])
+        get_or_create_product_with_category(validated_data)
+        self.context['created'] = validated_data.pop('created')
+        validated_data['shop'].categories.add(validated_data.pop('category'))
+        product_parameters = validated_data.pop('product_parameters', [])
+
+        prod_info = super().create(validated_data)
+        for item in product_parameters:
+            parameter, created = get_or_create_parameter(item['parameter']['name'])
+            prod_info.parameters.add(parameter, through_defaults={'value': item['value']})
+
+        return prod_info
+
+
+class PriceSerializer(serializers.ModelSerializer):
+    """ Сериализатор для просмотра прайса товаров.
     """
     product = ProductSerializer(read_only=True)
     shop = serializers.StringRelatedField()
-    product_parameters = ProductParameterSerializer(read_only=True, many=True)
+    # product_parameters = ProductParameterSerializer(read_only=True, many=True)  # Назначить правильный сериализатор.
 
     class Meta:
         model = models.ProductInfo
@@ -322,7 +397,7 @@ class ProductInfoSerializer(serializers.ModelSerializer):
 
 
 class ShortOrderItemSerializer(serializers.ModelSerializer):
-    """ Сериализатор для отображения товара в сокращённом формате.
+    """ Сериализатор для отображения Товара в сокращённом формате.
     """
     product = serializers.StringRelatedField(source='product_info', read_only=True)
 
@@ -332,7 +407,7 @@ class ShortOrderItemSerializer(serializers.ModelSerializer):
 
 
 class OrderListSerializer(serializers.ModelSerializer):
-    """ Сериализатор для отображения списка заказов.
+    """ Сериализатор для отображения Списка заказов.
     """
     state = serializers.CharField(source='get_state_display', read_only=True)
     ordered_items = ShortOrderItemSerializer(read_only=True, many=True)

@@ -1,7 +1,7 @@
 from django.db.models import Q
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
-from backend.models import Shop, Category
+from backend.models import Shop, Category, Product
 from backend.services import get_category
 
 
@@ -117,3 +117,14 @@ def validate_categories(request, shop):
         return [get_category(c) for c in data['category_ids'] if shop.categories.filter(id=c).exists()], errors_msg
 
     return [], errors_msg
+
+
+def get_or_create_product_with_category(data):
+    """ Получает объект Товара (определяет из названия)
+        и прикрепляет к нему Категорию (определяет из номера по каталогу).
+    """
+    product = data.pop('product')
+    category = Category.objects.get(catalog_number=product['category']['catalog_number'])
+    product_obj, created = Product.objects.update_or_create(name=product['name'], defaults={'category': category})
+    data['product'], data['created'], data['category'] = product_obj, created, category
+    return True
