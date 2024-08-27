@@ -10,7 +10,7 @@ from backend.services import (get_transmitted_obj, join_choice_errors, replace_s
                               get_category_by_name_and_catalog_number, get_category, get_category_by_catalog_number,
                               get_shop, get_or_create_parameter)
 from backend.validators import (is_not_salesman, is_permission_updated, is_validate_exists,
-                                get_or_create_product_with_category)
+                                get_or_create_product_with_category, add_parameters)
 
 Salesman = get_user_model()
 
@@ -328,7 +328,7 @@ class ParameterAndValueViewSerializer(serializers.ModelSerializer):
 
 
 class ProductInfoSerializer(serializers.ModelSerializer):
-    """ Сериализатор для создания и отображения Описания товара.
+    """ Сериализатор для создания, отображения и изменения Описания товара.
     """
     product = serializers.StringRelatedField(read_only=True)
     name = serializers.CharField(source='product.name', write_only=True)
@@ -381,6 +381,32 @@ class ProductInfoSerializer(serializers.ModelSerializer):
             prod_info.parameters.add(parameter, through_defaults={'value': item['value']})
 
         return prod_info
+
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        """ Вносит изменения в Описание товара.
+        """
+        instance.model = validated_data.get('model', instance.model)
+        instance.catalog_number = validated_data.get('catalog_number', instance.catalog_number)
+        instance.quantity = validated_data.get('quantity', instance.quantity)
+        instance.price = validated_data.get('price', instance.price)
+        instance.price_rrc = validated_data.get('price_rrc', instance.price_rrc)
+
+        if 'shop' in validated_data.keys():
+            instance.shop = get_shop(validated_data['shop']['name'])
+
+        if 'product' in validated_data.keys():
+            get_or_create_product_with_category(validated_data, instance.product.name)
+            instance.product = validated_data['product']
+            self.context['created'] = validated_data.pop('created')
+            if validated_data['category']:
+                instance.shop.categories.add(validated_data['category'])
+
+        if 'product_parameters' in validated_data.keys():
+            add_parameters(instance, validated_data['product_parameters'])
+
+        instance.save()
+        return instance
 
 
 class PriceSerializer(serializers.ModelSerializer):

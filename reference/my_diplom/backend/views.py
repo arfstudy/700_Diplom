@@ -239,7 +239,7 @@ class ProductView(viewsets.ModelViewSet):
 
 
 class ProductInfoView(viewsets.ModelViewSet):
-    """ Класс для создания и просмотра Описания товара.
+    """ Класс для создания, просмотра и изменения Описания товара.
     """
     queryset = models.ProductInfo.objects.all()
     serializer_class = serializers.ProductInfoSerializer

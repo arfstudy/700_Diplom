@@ -1,8 +1,8 @@
 from django.db.models import Q
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
-from backend.models import Shop, Category, Product
-from backend.services import get_category
+from backend.models import Shop, Category, Product, ProductParameter
+from backend.services import get_category, get_or_create_parameter
 
 
 def is_not_salesman(obj_ser, salesman):
@@ -119,12 +119,41 @@ def validate_categories(request, shop):
     return [], errors_msg
 
 
-def get_or_create_product_with_category(data):
+def get_or_create_product_with_category(data, instance_name=''):
     """ Получает объект Товара (определяет из названия)
         и прикрепляет к нему Категорию (определяет из номера по каталогу).
     """
-    product = data.pop('product')
-    category = Category.objects.get(catalog_number=product['category']['catalog_number'])
-    product_obj, created = Product.objects.update_or_create(name=product['name'], defaults={'category': category})
+    product, category = data.pop('product', {}), None
+    product_name = instance_name if instance_name else product['name']
+    product_obj, created = Product.objects.update_or_create(name=product_name)
+    if not created and 'name' in product.keys():
+        product_obj.name = product['name']
+        product_obj.save(update_fields=['name'])
+
+    if 'category' in product.keys() and 'catalog_number' in product['category'].keys():
+        category = Category.objects.get(catalog_number=product['category']['catalog_number'])
+        product_obj.category = category
+        product_obj.save(update_fields=['category'])
+
     data['product'], data['created'], data['category'] = product_obj, created, category
+    return True
+
+
+def add_parameters(prod_info, product_parameters):
+    """ Добавляет Параметры (характеристики) в Описание товара.
+        Название Параметра (характеристики) и его Значение должны присутствовать одновременно,
+        (Проверяется в сериализаторе 'ParameterAndValueViewSerializer').
+    """
+    for item in product_parameters:
+        parameter, created = get_or_create_parameter(item['parameter']['name'])
+        if prod_info.parameters.all().filter(name=parameter.name).exists():
+            if item['value'] and item['value'].replace(" ", ""):
+                param = ProductParameter.objects.get(product_info=prod_info, parameter=parameter)
+                param.value = item['value']
+                param.save(update_fields=['value'])
+            else:    # Если Значение характеристики "item['value']" равно пустому значению "None" или пустой строке "":
+                prod_info.parameters.remove(parameter)
+        elif item['value'] and item['value'].replace(" ", ""):
+            prod_info.parameters.add(parameter, through_defaults={'value': item['value']})
+
     return True
