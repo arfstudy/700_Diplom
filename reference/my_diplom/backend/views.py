@@ -9,7 +9,7 @@ from rest_framework.response import Response
 from backend import models, serializers
 from backend.permissions import IsAdminOrReadOnly, ShopPermission, IsOwnerPermissions
 from backend.services import (get_contacts, get_short_contacts, get_shops, get_shop, get_category, get_products,
-                              get_products_list, get_orders_list)
+                              get_product_infos, get_products_list, get_orders_list)
 from backend.validators import validate_categories
 
 Salesman = get_user_model()
@@ -244,6 +244,11 @@ class ProductInfoView(viewsets.ModelViewSet):
     queryset = models.ProductInfo.objects.all()
     serializer_class = serializers.ProductInfoSerializer
     permission_classes = [IsAdminUser]
+
+    def get_queryset(self):
+        """ Изменяет перечень возвращаемых данных.
+        """
+        return get_product_infos(self)
 
 
 class PriceView(generics.ListAPIView):

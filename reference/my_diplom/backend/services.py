@@ -215,6 +215,41 @@ def get_or_create_parameter(name):
     return Parameter.objects.get_or_create(name=name)
 
 
+def get_product_infos(product_view):
+    """ Возвращает список или один товар с полными характеристиками.
+        Регулирует перечень возвращаемых данных в зависимости от запрошенных get-параметров.
+    """
+    queryset = product_view.queryset
+    pk = int(product_view.kwargs.get("pk", 0))
+    if pk > 0:
+        queryset = queryset.filter(pk=pk)
+        if not queryset:
+            raise NotFound(f'Товар с id(info_id)={pk} не найден.')
+        return queryset
+
+    query = None
+    category_id = product_view.request.GET.get('category_id', '')
+    category_number = product_view.request.GET.get('category_number', '')
+    category_name = product_view.request.GET.get('category_name', '')
+    if category_id:
+        query = Q(product__category__id=category_id)
+    elif category_number:
+        query = Q(product__category__catalog_number=category_number)
+    elif category_name:
+        query = Q(product__category__name__icontains=category_name)
+    queryset = queryset if query is None else queryset.filter(query)
+
+    shop_id = product_view.request.GET.get('shop_id', '')
+    shop_name = product_view.request.GET.get('shop_name', '')
+    if shop_id:
+        return queryset.filter(shop__id=shop_id)
+
+    if shop_name:
+        return queryset.filter(shop__name__icontains=shop_name)
+
+    return queryset
+
+
 def get_products_list(self):
     """ Возвращает Прайс, список товаров.
         Регулирует перечень возвращаемых данных в зависимости от запрошенных параметров.
