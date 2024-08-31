@@ -5,7 +5,7 @@ Salesman = get_user_model()
 
 
 class Contact(models.Model):
-    """ Контакты пользователя.
+    """ Контакт пользователя.
     """
     salesman = models.ForeignKey(
         to=Salesman, on_delete=models.CASCADE, related_name='contacts', verbose_name='Покупатель'
@@ -19,10 +19,11 @@ class Contact(models.Model):
     phone = models.CharField(max_length=20, null=True, blank=True, verbose_name='Телефон')
 
     objects = models.Manager()
+    DoesNotExist = models.Manager
 
     class Meta:
-        verbose_name = 'Контакты пользователя'
-        verbose_name_plural = "Список контактов пользователя"
+        verbose_name = 'Контакт пользователя'
+        verbose_name_plural = 'Список контактов'
 
     def __str__(self):
         return f'{self.id}: {self.city}, {self.street} {self.house}'
@@ -52,18 +53,18 @@ class Shop(models.Model):
                                   verbose_name='Менеджер по продажам')
     buyer = models.OneToOneField(to=Salesman, on_delete=models.SET_NULL, null=True, blank=True, related_name='buyer',
                                  verbose_name='Менеджер по закупкам')
-    state = models.CharField(max_length=2, choices=Worked.choices, default=Worked.CLOSE, verbose_name='Приём заказов')
+    state = models.CharField(max_length=2, choices=Worked.choices, verbose_name='Приём заказов')
 
     objects = models.Manager()
     DoesNotExist = models.Manager
 
     class Meta:
         verbose_name = 'Магазин'
-        verbose_name_plural = "Список магазинов"
+        verbose_name_plural = 'Список магазинов'
         ordering = ['name']
 
     def __str__(self):
-        return self.name
+        return f'{self.id}: {self.name}'
 
     def save(self, *args, **kwargs):
         """ Сохраняет состояние магазина.
@@ -83,10 +84,11 @@ class Category(models.Model):
     """ Категория товара.
     """
     name = models.CharField(max_length=40, unique=True, verbose_name='Название')
-    catalog_number = models.IntegerField(verbose_name='Номер по каталогу')
+    catalog_number = models.IntegerField(unique=True, verbose_name='Номер по каталогу')
     shops = models.ManyToManyField(to=Shop, blank=True, related_name='categories', verbose_name='Магазины')
 
     objects = models.Manager()
+    DoesNotExist = models.Manager
 
     class Meta:
         verbose_name = 'Категория'
@@ -94,65 +96,68 @@ class Category(models.Model):
         ordering = ('name',)
 
     def __str__(self):
-        return self.name
+        return f'{self.id}: {self.name}, num={self.catalog_number}'
 
 
 class Product(models.Model):
-    """ Продукт.
+    """ Товар.
     """
     name = models.CharField(max_length=80, unique=True, verbose_name='Название')
     category = models.ForeignKey(to=Category, on_delete=models.CASCADE, null=True, blank=True, related_name='products',
                                  verbose_name='Категория')
 
     objects = models.Manager()
+    DoesNotExist = models.Manager
 
     class Meta:
-        verbose_name = 'Продукт'
-        verbose_name_plural = "Список продуктов"
+        verbose_name = 'Товар'
+        verbose_name_plural = 'Список товаров'
         ordering = ('name',)
 
     def __str__(self):
-        return self.name
+        return f'{self.id}: {self.name}'
 
 
 class ProductInfo(models.Model):
     """ Описание товара.
     """
-    model = models.CharField(max_length=80, verbose_name='Модель')
+    model = models.CharField(max_length=80, null=True, blank=True, verbose_name='Модель')
     catalog_number = models.PositiveIntegerField(verbose_name='Номер по каталогу')
     product = models.ForeignKey(to=Product, on_delete=models.CASCADE, null=True, blank=True,
-                                related_name='product_infos', verbose_name='Продукт')
-    shop = models.ForeignKey(to=Shop, on_delete=models.CASCADE, null=True, blank=True, related_name='product_infos',
+                                related_name='product_infos', verbose_name='Товар')
+    shop = models.ForeignKey(to=Shop, on_delete=models.SET_NULL, null=True, blank=True, related_name='product_infos',
                              verbose_name='Магазин')
-    quantity = models.PositiveIntegerField(null=True, blank=True, verbose_name='Количество')
-    price = models.PositiveIntegerField(null=True, blank=True, verbose_name='Закупочная цена')
-    price_rrc = models.PositiveIntegerField(null=True, blank=True, verbose_name='Рекомендуемая розничная цена')
+    quantity = models.PositiveIntegerField(default=0, verbose_name='Количество')
+    price = models.PositiveIntegerField(default=0, verbose_name='Закупочная цена')
+    price_rrc = models.PositiveIntegerField(default=0, verbose_name='Рекомендуемая розничная цена')
 
     objects = models.Manager()
+    DoesNotExist = models.Manager
 
     class Meta:
-        verbose_name = 'Информация о продукте'
-        verbose_name_plural = "Информационный список о продуктах"
+        verbose_name = 'Информация о товаре'
+        verbose_name_plural = 'Информация о товарах'
         constraints = [
             models.UniqueConstraint(fields=['product', 'shop', 'catalog_number'], name='unique_product_info'),
         ]
 
     def __str__(self):
-        return f'{self.product.name} {self.model}'
+        return f'{str(self.product)}, external_id={self.catalog_number}'
 
 
 class Parameter(models.Model):
     """ Параметр товара.
     """
     name = models.CharField(max_length=40, unique=True, verbose_name='Название параметра')
-    products = models.ManyToManyField(to=ProductInfo, through='ProductParameter', blank=True,
-                                      related_name='parameters', verbose_name='Магазины')
+    products = models.ManyToManyField(to=ProductInfo, through='ProductParameter', related_name='parameters',
+                                      verbose_name='Товары')
 
     objects = models.Manager()
+    DoesNotExist = models.Manager
 
     class Meta:
-        verbose_name = 'Имя параметра'
-        verbose_name_plural = "Список имён параметров"
+        verbose_name = 'Название параметра'
+        verbose_name_plural = 'Список параметров'
         ordering = ('name',)
 
     def __str__(self):
@@ -162,17 +167,18 @@ class Parameter(models.Model):
 class ProductParameter(models.Model):
     """ Значение параметра товара.
     """
-    product_info = models.ForeignKey(to=ProductInfo, on_delete=models.CASCADE, related_name='product_parameters',
-                                     verbose_name='Описание товара')
+    product_info = models.ForeignKey(to=ProductInfo, on_delete=models.SET_NULL, null=True, blank=True,
+                                     related_name='product_parameters', verbose_name='Товар')
     parameter = models.ForeignKey(to=Parameter, on_delete=models.CASCADE, related_name='product_parameters',
                                   verbose_name='Название параметра')
-    value = models.CharField(max_length=100, verbose_name='Значение параметра')
+    value = models.CharField(max_length=100, null=True, blank=True, verbose_name='Значение параметра')
 
     objects = models.Manager()
+    DoesNotExist = models.Manager
 
     class Meta:
         verbose_name = 'Значение параметра'
-        verbose_name_plural = "Список значений параметров"
+        verbose_name_plural = 'Значения параметров'
         constraints = [
             models.UniqueConstraint(fields=['product_info', 'parameter'], name='unique_product_parameter'),
         ]
@@ -185,31 +191,30 @@ class Order(models.Model):
         """ Статусы состояния заказа. """
         BASKET = 'BS', 'В корзине'
         NEW = 'NE', 'Новый'
-        """ 1) На данный момент Вам недоступно изменение заказа. Нужно отменить заказ.
-            2) Ваш заказ отменён.
-        """
         CONFIRMED = 'CF', 'Подтверждён'
         ASSEMBLED = 'AS', 'Собран'
         SENT = 'SN', 'Отправлен'
         CANCELED = 'CN', 'Отменён'
         # DELIVERED = 'DV', 'Доставлен'    # Заменил на "Получен".
         RECEIVED = 'RC', 'Получен'
+        DELETE = 'DL', 'Удалён'            # Добавил для "Удалённых" заказов.
 
     customer = models.ForeignKey(to=Salesman, on_delete=models.CASCADE, related_name='orders',
                                  verbose_name='Покупатель')
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='Дата создания')
     state = models.CharField(max_length=2, choices=Status.choices, default=Status.BASKET, verbose_name='Статус')
     updated_state = models.DateTimeField(auto_now=True, verbose_name='Дата изменения')
-    contact = models.ForeignKey(to=Contact, on_delete=models.CASCADE, null=True, blank=True,
+    contact = models.ForeignKey(to=Contact, on_delete=models.SET_NULL, null=True, blank=True,
                                 related_name='orders', verbose_name='Адрес доставки')
     product_infos = models.ManyToManyField(to=ProductInfo, through='OrderItem', related_name='orders',
-                                          verbose_name='Магазины')
+                                          verbose_name='Товары')
 
     objects = models.Manager()
+    DoesNotExist = models.Manager
 
     class Meta:
         verbose_name = 'Заказ'
-        verbose_name_plural = "Список заказов"
+        verbose_name_plural = 'Список заказов'
         ordering = ['-created_at']
 
     def __str__(self):
@@ -227,14 +232,15 @@ class OrderItem(models.Model):
     """
     order = models.ForeignKey(to=Order, on_delete=models.CASCADE, related_name='ordered_items', verbose_name='Заказ')
     product_info = models.ForeignKey(to=ProductInfo, on_delete=models.CASCADE, related_name='ordered_items',
-                                verbose_name='Продукт')
+                                verbose_name='Товар')
     quantity = models.PositiveIntegerField(default=1, verbose_name='Количество')
 
     objects = models.Manager()
+    DoesNotExist = models.Manager
 
     class Meta:
         verbose_name = 'Заказанная позиция'
-        verbose_name_plural = "Список заказанных позиций"
+        verbose_name_plural = 'Список заказанных позиций'
         constraints = [
-            models.UniqueConstraint(fields=['order_id', 'product_info'], name='unique_order_item'),
+            models.UniqueConstraint(fields=['order', 'product_info'], name='unique_order_item'),
         ]
