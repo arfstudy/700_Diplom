@@ -1,7 +1,7 @@
 from django.db.models import Q
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
-from backend.models import Shop, Category, Product, ProductParameter
+from backend.models import Shop, Category, Product, ProductParameter, ProductInfo
 from backend.services import get_category, get_or_create_parameter
 
 
@@ -157,3 +157,43 @@ def add_parameters(prod_info, product_parameters):
             prod_info.parameters.add(parameter, through_defaults={'value': item['value']})
 
     return True
+
+
+def remove_parameters(prod_info):
+    """ Отвязывает Параметры (характеристики) от Описания товара.
+        Если у отдельного Параметра (характеристики) больше нет связанных Значений, то сам Параметр удаляется тоже.
+    """
+    for item in prod_info.parameters.all():
+        param_value = ProductParameter.objects.get(product_info=prod_info, parameter=item).value
+        prod_info.parameters.remove(item)
+        if not item.product_parameters.exclude(value=param_value).exists():
+            item.delete()
+
+    return True
+
+
+def delete_product_info(product_info):
+    """ Удаляет Описание товара с учётом связей его с моделями Категории, Товара, Параметров и Значений параметров.
+    """
+    result = {'id': product_info.id}
+    prod = product_info.product
+    # Если у данного Товара больше нет ни одного Описания, то он будет удалён.
+    is_delete_product = not ProductInfo.objects.exclude(id=product_info.id).filter(product=prod).exists()
+    category = product_info.product.category
+    shop = product_info.shop
+    # Отвязывает Параметры (характеристики) от Описания товара.
+    remove_parameters(product_info)
+    product_info.delete()
+    # Отвязывает Категорию от Магазина, если в Магазине больше нет Товаров данной Категории.
+    if not Product.objects.exclude(id=prod.id).filter(category=category, product_infos__shop=shop).exists():
+        shop.categories.remove(category)
+
+    if is_delete_product:
+        # Если в данной Категории больше нет ни одного Товара, то сообщается об этом.
+        if not Product.objects.exclude(id=prod.id).filter(category=category).exists():
+            result['category'] = str(category)
+
+        result['product'] = str(prod)
+        prod.delete()
+
+    return result

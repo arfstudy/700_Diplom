@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.db import transaction
 from rest_framework import viewsets, status, generics
 from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound
@@ -10,7 +11,7 @@ from backend import models, serializers
 from backend.permissions import IsAdminOrReadOnly, ShopPermission, IsOwnerPermissions
 from backend.services import (get_contacts, get_short_contacts, get_shops, get_shop, get_category, get_products,
                               get_product_infos, get_products_list, get_orders_list)
-from backend.validators import validate_categories
+from backend.validators import validate_categories, delete_product_info
 
 Salesman = get_user_model()
 
@@ -239,7 +240,7 @@ class ProductView(viewsets.ModelViewSet):
 
 
 class ProductInfoView(viewsets.ModelViewSet):
-    """ Класс для создания, просмотра и изменения Описания товара.
+    """ Класс для создания, просмотра, изменения и удаления Описания товара.
     """
     queryset = models.ProductInfo.objects.all()
     serializer_class = serializers.ProductInfoSerializer
@@ -249,6 +250,19 @@ class ProductInfoView(viewsets.ModelViewSet):
         """ Изменяет перечень возвращаемых данных.
         """
         return get_product_infos(self)
+
+    def destroy(self, request, *args, **kwargs):
+        """ Удаляет Описание товара.
+        """
+        with transaction.atomic():
+            result = delete_product_info(self.get_object())
+        content = [f'Описание товара с id(info_id)={result['id']} удалено.']
+        if 'product' in result.keys():
+            content += [f'Товар `{result['product']}` удалён.']
+        if 'category' in result.keys():
+            content += [f'В Категорию `{result['category']}` больше не входит ни один Товар.']
+
+        return Response(data={'detail': content}, status=status.HTTP_204_NO_CONTENT)
 
 
 class PriceView(generics.ListAPIView):
