@@ -224,6 +224,19 @@ class ProductView(viewsets.ModelViewSet):
         """
         return get_products(self)
 
+    def destroy(self, request, *args, **kwargs):
+        """ Удаляет Товар.
+        """
+        pk = kwargs.get('pk', None)
+        prod = self.get_object()
+        if  prod.product_infos.exists():
+            return Response(data={'detail': [
+                                    f'Нельзя удалить Товар с id={pk}, так как у него есть зависимые Описания товара.',
+                                    'Удаление Товара так же происходит при удалении последнего Описания.']},
+                            status=status.HTTP_405_METHOD_NOT_ALLOWED)
+        prod.delete()
+        return Response(data={'detail': [f'Товар с id={pk} удалён.']}, status=status.HTTP_204_NO_CONTENT)
+
 
 class ProductInfoView(generics.ListAPIView):
     """ Класс для просмотра списка товаров (прайса) с дополнительными сведениями.
