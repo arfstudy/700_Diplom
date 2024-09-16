@@ -8,11 +8,11 @@ from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 
 from backend import models, serializers
-from backend.permissions import IsAdminOrReadOnly, ShopPermission, IsBuyer, IsOwnerPermissions
+from backend.filters import OrderFilter
+from backend.permissions import IsAdminOrReadOnly, ShopPermission, IsBuyer
 from backend.services import (get_contacts, get_short_contacts, get_shops, get_shop, get_category, get_products,
-                              get_product_infos, converting_categories_data, converting_products_data,
-                              get_price, get_orders_list)
-from backend.validators import validate_categories, delete_product_info, load_yaml_data, get_shop_obj
+                              get_product_infos, converting_categories_data, converting_products_data, get_price)
+from backend.validators import validate_categories, delete_product_info, load_yaml_data, get_shop_obj, get_state_orders
 
 Salesman = get_user_model()
 
@@ -346,10 +346,12 @@ class OrderView(viewsets.ModelViewSet):
     queryset = models.Order.objects.all()
     serializer_class = serializers.OrderSerializer
     permission_classes = [IsAuthenticated]
+    filterset_class = OrderFilter
 
     def get_queryset(self):
         """ Возвращает Пользователю список его Заказов, кроме удалённых.
             Администраторам доступны Заказы всех Пользователей, в том числе, удалённые.
+            Администратор может выбрать Заказы конкретного Пользователя.
         """
         queryset = (self.queryset if self.request.user.is_staff
                     else self.queryset.exclude(state=models.Order.Status.DELETE).filter(customer=self.request.user))
@@ -360,4 +362,6 @@ class OrderView(viewsets.ModelViewSet):
             if not queryset:
                 raise NotFound(f'У Вас нет Заказа с id={pk}.')
 
-        return queryset
+            return queryset
+
+        return get_state_orders(self, queryset)

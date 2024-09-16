@@ -5,7 +5,8 @@ from requests import get
 from rest_framework.exceptions import PermissionDenied, ValidationError, NotFound
 from yaml import load as load_yaml, Loader
 
-from backend.models import Shop, Category, Product, ProductParameter, ProductInfo
+from apiauth.services import verify_choices
+from backend.models import Shop, Category, Product, ProductParameter, ProductInfo, Order
 from backend.services import get_category, get_or_create_parameter, get_shop
 
 
@@ -245,3 +246,42 @@ def get_shop_obj(request, shop_name):
         raise PermissionDenied(detail={'detail': f'Вы не являетесь `Менеджером по закупкам` магазина `{shop_name}`.'})
 
     return shop
+
+
+def get_state_orders(order_view, queryset):
+    """ Находит Заказы указанного статуса или нескольких статусов.
+        Можно выбрать несколько статусов, перечислив их через запятую: '?state=подтвеРЖДён,Собран,sn'.
+        - это три статуса 'confirmed', 'assembled' и 'sent'.
+        Сортирует.
+    """
+    query, detail_errors, param_msg = None, {}, ''
+    # Возможные варианты состояния заказа: 'basket', 'new', 'confirmed', 'assembled', 'sent', 'canceled', 'received'.
+    # Так же возможны значения, сохраняемые в БД, и человеко читаемые значения - все регистронезависимые.
+    if 'state' in order_view.request.GET.keys():
+        state_line = order_view.request.GET['state']
+        states = state_line.split(',')
+        for value in states:
+            # Проверяем get-параметр 'state' на принадлежность к значениям перечисляемого типа.
+            value, errors = verify_choices(value, Order.Status)
+            if errors:
+                if param_msg:
+                    param_msg += f', `{value}`'
+                else:
+                    param_msg = f'Нераспознанное значение в get-параметре `state={state_line}`, а именно `{value}`'
+                    detail_errors = errors.copy()
+
+            elif not param_msg:
+                query = Q(state=value) if query is None else (query | Q(state=value))
+
+        if param_msg:
+            raise ValidationError(detail={'errors': [param_msg + '.'], 'detail': [detail_errors['errors']]})
+
+    if query:
+        queryset = queryset.filter(query)
+
+    # Сортируем отображение Заказов в порядке возростания индексов.
+    sort_param = order_view.request.GET.get('sort', '')
+    if sort_param == 'id':
+        return queryset.order_by(sort_param)
+
+    return queryset
