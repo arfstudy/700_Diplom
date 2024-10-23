@@ -7,7 +7,7 @@ from yaml import load as load_yaml, Loader
 
 from apiauth.services import verify_choices
 from backend.models import Shop, Category, Product, ProductParameter, ProductInfo, Order
-from backend.services import get_category, get_or_create_parameter, get_shop
+from backend.services import get_category, get_or_create_parameter, get_shop, set_new_category
 
 
 def is_not_salesman(obj_ser, salesman):
@@ -130,15 +130,15 @@ def get_or_create_product_with_category(data, instance_name=''):
     """
     product, category = data.pop('product', {}), None
     product_name = instance_name if instance_name else product['name']
-    product_obj, created = Product.objects.update_or_create(name=product_name)
+    product_obj, created = Product.objects.get_or_create(name=product_name)
     if not created and 'name' in product.keys():
         product_obj.name = product['name']
         product_obj.save(update_fields=['name'])
 
     if 'category' in product.keys() and 'catalog_number' in product['category'].keys():
         category = Category.objects.get(catalog_number=product['category']['catalog_number'])
-        product_obj.category = category
-        product_obj.save(update_fields=['category'])
+        if category != product_obj.category:
+            set_new_category(product_obj, category)
 
     data['product'], data['created'], data['category'] = product_obj, created, category
     return True

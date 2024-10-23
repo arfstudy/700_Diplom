@@ -8,7 +8,7 @@ from backend import models
 from backend.forms import ContactHasDiffForm, ShopHasDiffForm
 from backend.services import (get_transmitted_obj, join_choice_errors, replace_salesmans_errors,
                               get_category_by_name_and_catalog_number, get_category, get_category_by_catalog_number,
-                              get_shop, get_or_create_parameter)
+                              get_shop, get_or_create_parameter, set_new_category)
 from backend.validators import (is_not_salesman, is_permission_updated, is_validate_exists,
                                 get_or_create_product_with_category, add_parameters)
 
@@ -260,9 +260,8 @@ class ProductSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_shops(obj):
-        products = obj.product_infos.all()
-        shops = [str(p.shop) for p in products]
-        return shops
+        shops = models.Shop.objects.filter(categories__products=obj).distinct()
+        return [str(s) for s in shops]
 
     @staticmethod
     def validate_category_number(value):
@@ -293,10 +292,9 @@ class ProductSerializer(serializers.ModelSerializer):
         category_obj, data = get_category_by_catalog_number(validated_data)
 
         instance.name = validated_data.get("name", instance.name)
-        if category_obj:
-            instance.category = category_obj
+        if category_obj and category_obj != instance.category:
+            set_new_category(instance, category_obj)
 
-        instance.save()
         return instance
 
 
@@ -399,8 +397,6 @@ class ProductInfoSerializer(serializers.ModelSerializer):
             get_or_create_product_with_category(validated_data, instance.product.name)
             instance.product = validated_data['product']
             self.context['created'] = validated_data.pop('created')
-            if validated_data['category']:
-                instance.shop.categories.add(validated_data['category'])
 
         if 'product_parameters' in validated_data.keys():
             add_parameters(instance, validated_data['product_parameters'])

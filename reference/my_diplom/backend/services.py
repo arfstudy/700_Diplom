@@ -3,7 +3,7 @@ from django.core.exceptions import MultipleObjectsReturned
 from django.db.models import Q
 from rest_framework.exceptions import NotFound, ValidationError
 
-from backend.models import Contact, Shop, ProductInfo, Category, Parameter
+from backend.models import Contact, Shop, ProductInfo, Category, Parameter, Product
 
 Salesman = get_user_model()
 
@@ -280,7 +280,7 @@ def converting_products_data(goods_dict, shop_name):
 
 def get_price(self):
     """ Возвращает Прайс, список товаров.
-        Регулирует перечень возвращаемых данных в зависимости от запрошенного магазина и категории.
+        Регулирует перечень возвращаемых данных в зависимости от запрошенной Категории и Магазина.
     """
     query = Q(shop__state=Shop.Worked.OPEN) & Q(quantity__gt=0)
     category_id = self.request.GET.get('category_id', '')
@@ -322,3 +322,22 @@ def get_price(self):
     queryset = queryset.order_by(sort_param)
 
     return queryset
+
+
+def set_new_category(product, new_category):
+    """ В Товаре заменяет старую Категорию на новую.
+        Заменяет название Категории во всех Магазинах связанных с Товаром.
+        При необходимости, удаляет старую Категорию мз Магазина.
+    """
+    old_category = product.category
+    for shop in Shop.objects.filter(categories__products=product).distinct():
+        if not Product.objects.exclude(id=product.id).filter(category=old_category, product_infos__shop=shop).exists():
+            # Если в Магазине нет других Товаров старой Категории, то она удаляется.
+            shop.categories.remove(old_category)
+
+        shop.categories.add(new_category)
+
+    product.category = new_category
+    product.save(update_fields=['category'])
+
+    return True
