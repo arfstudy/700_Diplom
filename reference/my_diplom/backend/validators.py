@@ -256,7 +256,8 @@ def get_state_orders(order_view, queryset):
         Сортирует.
     """
     query, detail_errors, param_msg = None, {}, ''
-    # Возможные варианты состояния заказа: 'basket', 'new', 'confirmed', 'assembled', 'sent', 'canceled', 'received'.
+    # Возможные варианты состояния заказа: 'basket', 'new', 'confirmed', 'assembled', 'sent', 'canceled', 'received'
+    # и 'delete'.
     # Так же возможны значения, сохраняемые в БД, и человеко читаемые значения - все регистронезависимые.
     if 'state' in order_view.request.GET.keys():
         state_line = order_view.request.GET['state']
@@ -286,3 +287,22 @@ def get_state_orders(order_view, queryset):
         return queryset.order_by(sort_param)
 
     return queryset
+
+
+def is_enough_products(products):
+    """ Проверяет наличие достаточного количества Товаров в Магазине.
+        Параметр на присутствие тоже.  'info_id' или 'external_id'
+    """
+    err_flag, msg = False, ['Вы пытаетесь добавить в корзину Товар в количестве, превышающем остаток в Магазине:']
+    for product in products:
+        prod_info = product['product_info']
+        prod_id = prod_info['id'] if 'id' in prod_info.keys() else prod_info['catalog_number']
+        # if not is_enough(attr):
+        #     err_flag = True
+        #     msg += [f"Товар '{product}', в Магазине shop_id={attr['shop_id']} остаток {value}"]
+        #     # "Вы пытаетесь добавить товар в корзину {quantity} шт, а в Магазине id={attr['shop_id']} остаток {value}"
+
+    # if err_flag:
+    #     raise ValidationError(f"Не хватает Товара {value}={value}.")
+
+    return

@@ -341,7 +341,7 @@ class PriceView(generics.ListAPIView):
 
 
 class OrderView(viewsets.ModelViewSet):
-    """ Класс для просмотра Заказа.
+    """ Класс для создания и просмотра Заказа.
     """
     queryset = models.Order.objects.all()
     serializer_class = serializers.OrderSerializer
@@ -353,7 +353,7 @@ class OrderView(viewsets.ModelViewSet):
             Администраторам доступны Заказы всех Пользователей, в том числе, удалённые.
             Администратор может выбрать Заказы конкретного Пользователя.
         """
-        queryset = (self.queryset if self.request.user.is_staff
+        queryset = (self.queryset if self.request.user.is_staff or self.request.user.is_superuser
                     else self.queryset.exclude(state=models.Order.Status.DELETE).filter(customer=self.request.user))
 
         pk = int(self.kwargs.get("pk", 0))
