@@ -298,8 +298,8 @@ class ProductSerializer(serializers.ModelSerializer):
         return instance
 
 
-class ParameterAndValueViewSerializer(serializers.ModelSerializer):
-    """ Сериализатор для создания и отображения Названия характеристики и его Значения.
+class ParameterAndValueSerializer(serializers.ModelSerializer):
+    """ Сериализатор для создания и отображения Названия характеристики и его Значения внутри Описания товара.
     """
     parameter = serializers.CharField(source='parameter.name')
 
@@ -330,7 +330,7 @@ class ProductInfoSerializer(serializers.ModelSerializer):
     """
     product = serializers.StringRelatedField(read_only=True)
     name = serializers.CharField(source='product.name', write_only=True)
-    product_parameters = ParameterAndValueViewSerializer(required=False, many=True)
+    product_parameters = ParameterAndValueSerializer(required=False, many=True)
     category_number = serializers.CharField(source='product.category.catalog_number', write_only=True)
     category = serializers.StringRelatedField(source='product.category', read_only=True)
     shop_name = serializers.CharField(source='shop.name', write_only=True)
@@ -362,6 +362,20 @@ class ProductInfoSerializer(serializers.ModelSerializer):
             raise NotFound(f'Категория с номером по каталогу catalog_number={value} не существует.')
 
         return value
+
+    def validate(self, attrs):
+        """ Предостерегает от повторного внесения Товара в Магазин.
+            При изменении Описания товара такую проверку проводить не требуется.
+        """
+        if (self.context['view'].action == 'create'
+            and models.ProductInfo.objects.filter(catalog_number=attrs['catalog_number'],
+                                                  product__name=attrs['product']['name'],
+                                                  shop__name=attrs['shop']['name']
+                                                  ).exists()):
+            raise ValidationError(detail={'prod_info_err': 'Товар с таким Номером по каталогу и Описанием уже'
+                                                           ' существует в этом Магазине.'},)
+
+        return attrs
 
     @transaction.atomic
     def create(self, validated_data):
@@ -409,7 +423,7 @@ class PriceSerializer(serializers.ModelSerializer):
     """ Сериализатор для просмотра Прайса товаров.
     """
     product = serializers.StringRelatedField(read_only=True)
-    product_parameters = ParameterAndValueViewSerializer(read_only=True, many=True)
+    product_parameters = ParameterAndValueSerializer(read_only=True, many=True)
     category = serializers.StringRelatedField(source='product.category', read_only=True)
     shop = serializers.StringRelatedField(read_only=True)
 

@@ -261,7 +261,7 @@ class ProductInfoView(viewsets.ModelViewSet):
         if 'product' in result.keys():
             content += [f'Товар `{result['product']}` удалён.']
         if 'category' in result.keys():
-            content += [f'В Категорию `{result['category']}` больше не входит ни один Товар.']
+            content += [f'В Категорию `{result['category']}` больше не входит ни один Товар. Удалена.']
 
         return Response(data={'detail': content}, status=status.HTTP_204_NO_CONTENT)
 
@@ -293,7 +293,7 @@ class PartnerUpdate(views.APIView):
         products, all_num, new_num, skip_num, errors = [], len(products_data), 0, 0, {}
         for prod_data in products_data:
             # Товары сохраняются в БД по одному.
-            # При ошибке пропустится сохранение только одного, ошибочного, Товара, а не всего пакета.
+            # При ошибке пропустится сохранение только ошибочного Товара, а не всего пакета.
             product_ser = serializers.ProductInfoSerializer(data=prod_data, context={'view': self})
             if product_ser.is_valid():
                 try:
@@ -305,10 +305,10 @@ class PartnerUpdate(views.APIView):
                     products.append(product_ser.data)
                     new_num += 1 if product_ser.context.pop('created', False) else 0
             else:
-                if product_ser.errors['external_id'][0].code == 'unique':
-                    errors[f'{prod_data['external_id']}'] = product_ser.errors['external_id']
+                if 'prod_info_err' in product_ser.errors.keys():
+                    errors[f'{prod_data['external_id']}'] = str(product_ser.errors['prod_info_err'][0])
                 else:
-                    errors[f'{prod_data['external_id']}'] = product_ser.errors
+                    errors[f'{prod_data['external_id']}'] = str(product_ser.errors)
                 skip_num += 1
 
         if all_num == 0:

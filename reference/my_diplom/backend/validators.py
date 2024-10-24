@@ -189,14 +189,15 @@ def delete_product_info(product_info):
     # Отвязывает Параметры (характеристики) от Описания товара.
     remove_parameters(product_info)
     product_info.delete()
-    # Отвязывает Категорию от Магазина, если в Магазине больше нет Товаров данной Категории.
+    # Если в Магазине больше нет Товаров данной Категории, то Категория отвязывается от Магазина.
     if not Product.objects.exclude(id=prod.id).filter(category=category, product_infos__shop=shop).exists():
         shop.categories.remove(category)
 
     if is_delete_product:
-        # Если в данной Категории больше нет ни одного Товара, то сообщается об этом.
+        # Если в данной Категории больше нет ни одного Товара, то она удаляется.
         if not Product.objects.exclude(id=prod.id).filter(category=category).exists():
             result['category'] = str(category)
+            category.delete()
 
         result['product'] = str(prod)
         prod.delete()
