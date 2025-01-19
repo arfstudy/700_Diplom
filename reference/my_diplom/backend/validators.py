@@ -7,7 +7,7 @@ from yaml import load as load_yaml, Loader
 
 from apiauth.services import verify_choices
 from backend.models import Shop, Category, Product, ProductParameter, ProductInfo, Order
-from backend.services import get_category, get_or_create_parameter, get_shop
+from backend.services import get_category, get_or_create_parameter, get_shop, set_new_category
 
 
 def is_not_salesman(obj_ser, salesman):
@@ -130,15 +130,15 @@ def get_or_create_product_with_category(data, instance_name=''):
     """
     product, category = data.pop('product', {}), None
     product_name = instance_name if instance_name else product['name']
-    product_obj, created = Product.objects.update_or_create(name=product_name)
+    product_obj, created = Product.objects.get_or_create(name=product_name)
     if not created and 'name' in product.keys():
         product_obj.name = product['name']
         product_obj.save(update_fields=['name'])
 
     if 'category' in product.keys() and 'catalog_number' in product['category'].keys():
         category = Category.objects.get(catalog_number=product['category']['catalog_number'])
-        product_obj.category = category
-        product_obj.save(update_fields=['category'])
+        if category != product_obj.category:
+            set_new_category(product_obj, category)
 
     data['product'], data['created'], data['category'] = product_obj, created, category
     return True
@@ -189,14 +189,15 @@ def delete_product_info(product_info):
     # Отвязывает Параметры (характеристики) от Описания товара.
     remove_parameters(product_info)
     product_info.delete()
-    # Отвязывает Категорию от Магазина, если в Магазине больше нет Товаров данной Категории.
+    # Если в Магазине больше нет Товаров данной Категории, то Категория отвязывается от Магазина.
     if not Product.objects.exclude(id=prod.id).filter(category=category, product_infos__shop=shop).exists():
         shop.categories.remove(category)
 
     if is_delete_product:
-        # Если в данной Категории больше нет ни одного Товара, то сообщается об этом.
+        # Если в данной Категории больше нет ни одного Товара, то она удаляется.
         if not Product.objects.exclude(id=prod.id).filter(category=category).exists():
             result['category'] = str(category)
+            category.delete()
 
         result['product'] = str(prod)
         prod.delete()
@@ -255,7 +256,8 @@ def get_state_orders(order_view, queryset):
         Сортирует.
     """
     query, detail_errors, param_msg = None, {}, ''
-    # Возможные варианты состояния заказа: 'basket', 'new', 'confirmed', 'assembled', 'sent', 'canceled', 'received'.
+    # Возможные варианты состояния заказа: 'basket', 'new', 'confirmed', 'assembled', 'sent', 'canceled', 'received'
+    # и 'delete'.
     # Так же возможны значения, сохраняемые в БД, и человеко читаемые значения - все регистронезависимые.
     if 'state' in order_view.request.GET.keys():
         state_line = order_view.request.GET['state']
@@ -285,3 +287,22 @@ def get_state_orders(order_view, queryset):
         return queryset.order_by(sort_param)
 
     return queryset
+
+
+def is_enough_products(products):
+    """ Проверяет наличие достаточного количества Товаров в Магазине.
+        Параметр на присутствие тоже.  'info_id' или 'external_id'
+    """
+    err_flag, msg = False, ['Вы пытаетесь добавить в корзину Товар в количестве, превышающем остаток в Магазине:']
+    for product in products:
+        prod_info = product['product_info']
+        prod_id = prod_info['id'] if 'id' in prod_info.keys() else prod_info['catalog_number']
+        # if not is_enough(attr):
+        #     err_flag = True
+        #     msg += [f"Товар '{product}', в Магазине shop_id={attr['shop_id']} остаток {value}"]
+        #     # "Вы пытаетесь добавить товар в корзину {quantity} шт, а в Магазине id={attr['shop_id']} остаток {value}"
+
+    # if err_flag:
+    #     raise ValidationError(f"Не хватает Товара {value}={value}.")
+
+    return

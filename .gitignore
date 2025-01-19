@@ -87,6 +87,9 @@ target/
 # VS Code
 .vscode/
 
+# GigaIDE
+.gigaide/
+
 # Папки с виртуальными средами для домашних работ
 *_venv/
 

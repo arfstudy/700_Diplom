@@ -1,16 +1,16 @@
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from rest_framework import serializers
-from rest_framework.exceptions import ValidationError, NotFound
+from rest_framework.exceptions import ValidationError, NotFound, ErrorDetail
 
 from apiauth.validators import pre_check_incoming_fields
 from backend import models
 from backend.forms import ContactHasDiffForm, ShopHasDiffForm
 from backend.services import (get_transmitted_obj, join_choice_errors, replace_salesmans_errors,
                               get_category_by_name_and_catalog_number, get_category, get_category_by_catalog_number,
-                              get_shop, get_or_create_parameter)
+                              get_shop, get_or_create_parameter, set_new_category)
 from backend.validators import (is_not_salesman, is_permission_updated, is_validate_exists,
-                                get_or_create_product_with_category, add_parameters)
+                                get_or_create_product_with_category, add_parameters, is_enough_products)
 
 Salesman = get_user_model()
 
@@ -260,9 +260,8 @@ class ProductSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_shops(obj):
-        products = obj.product_infos.all()
-        shops = [str(p.shop) for p in products]
-        return shops
+        shops = models.Shop.objects.filter(categories__products=obj).distinct()
+        return [str(s) for s in shops]
 
     @staticmethod
     def validate_category_number(value):
@@ -293,15 +292,14 @@ class ProductSerializer(serializers.ModelSerializer):
         category_obj, data = get_category_by_catalog_number(validated_data)
 
         instance.name = validated_data.get("name", instance.name)
-        if category_obj:
-            instance.category = category_obj
+        if category_obj and category_obj != instance.category:
+            set_new_category(instance, category_obj)
 
-        instance.save()
         return instance
 
 
-class ParameterAndValueViewSerializer(serializers.ModelSerializer):
-    """ Сериализатор для создания и отображения Названия характеристики и его Значения.
+class ParameterAndValueSerializer(serializers.ModelSerializer):
+    """ Сериализатор для создания и отображения Названия характеристики и его Значения внутри Описания товара.
     """
     parameter = serializers.CharField(source='parameter.name')
 
@@ -310,9 +308,11 @@ class ParameterAndValueViewSerializer(serializers.ModelSerializer):
         fields = ['parameter', 'value']
 
     def validate_value(self, value):
-        """ Проверяет поле 'value' на наличие содержимого.
+        """ Проверяет поле 'value' на наличие содержимого. (Только при создании нового Описания.)
+            При изменении, пустое значение поля 'value' приводит к удалению соответствующей Характеристики
+            из Описания товара.
         """
-        if self.context['view'].action == 'create' and not value:
+        if self.context['view'].action == 'create' and (not value or value.replace(" ", "") == ""):
             raise ValidationError(detail=['Это поле не может иметь пустое значение `null` или пустую строку ``.'])
 
         return value
@@ -332,7 +332,7 @@ class ProductInfoSerializer(serializers.ModelSerializer):
     """
     product = serializers.StringRelatedField(read_only=True)
     name = serializers.CharField(source='product.name', write_only=True)
-    product_parameters = ParameterAndValueViewSerializer(required=False, many=True)
+    product_parameters = ParameterAndValueSerializer(required=False, many=True)
     category_number = serializers.CharField(source='product.category.catalog_number', write_only=True)
     category = serializers.StringRelatedField(source='product.category', read_only=True)
     shop_name = serializers.CharField(source='shop.name', write_only=True)
@@ -364,6 +364,20 @@ class ProductInfoSerializer(serializers.ModelSerializer):
             raise NotFound(f'Категория с номером по каталогу catalog_number={value} не существует.')
 
         return value
+
+    def validate(self, attrs):
+        """ Предостерегает от повторного внесения Товара в Магазин.
+            При изменении Описания товара такую проверку проводить не требуется.
+        """
+        if (self.context['view'].action == 'create'
+            and models.ProductInfo.objects.filter(catalog_number=attrs['catalog_number'],
+                                                  product__name=attrs['product']['name'],
+                                                  shop__name=attrs['shop']['name']
+                                                  ).exists()):
+            raise ValidationError(detail={'prod_info_err': 'Товар с таким Номером по каталогу и Описанием уже'
+                                                           ' существует в этом Магазине.'},)
+
+        return attrs
 
     @transaction.atomic
     def create(self, validated_data):
@@ -399,8 +413,6 @@ class ProductInfoSerializer(serializers.ModelSerializer):
             get_or_create_product_with_category(validated_data, instance.product.name)
             instance.product = validated_data['product']
             self.context['created'] = validated_data.pop('created')
-            if validated_data['category']:
-                instance.shop.categories.add(validated_data['category'])
 
         if 'product_parameters' in validated_data.keys():
             add_parameters(instance, validated_data['product_parameters'])
@@ -413,7 +425,7 @@ class PriceSerializer(serializers.ModelSerializer):
     """ Сериализатор для просмотра Прайса товаров.
     """
     product = serializers.StringRelatedField(read_only=True)
-    product_parameters = ParameterAndValueViewSerializer(read_only=True, many=True)
+    product_parameters = ParameterAndValueSerializer(read_only=True, many=True)
     category = serializers.StringRelatedField(source='product.category', read_only=True)
     shop = serializers.StringRelatedField(read_only=True)
 
@@ -431,36 +443,154 @@ class PriceSerializer(serializers.ModelSerializer):
 
 
 class ShortOrderItemSerializer(serializers.ModelSerializer):
-    """ Сериализатор для отображения Товара в сокращённом формате.
+    """ Сериализатор для добавления и отображения Товара в Заказе.
     """
-    info_id = serializers.CharField(source='product_info.id', read_only=True)
+    info_id = serializers.CharField(source='product_info.id')
     product = serializers.StringRelatedField(source='product_info.product', read_only=True)
+    external_id = serializers.CharField(source='product_info.catalog_number', read_only=True)
     price = serializers.CharField(source='product_info.price_rrc', read_only=True)
     shop = serializers.StringRelatedField(source='product_info.shop', read_only=True)
+    shop_id = serializers.CharField(source='product_info.shop.id', write_only=True)
 
     class Meta:
         model = models.OrderItem
-        fields = ['info_id', 'product', 'quantity', 'price', 'shop']
-        read_only_fields = ['quantity']
+        fields = ['info_id', 'product', 'external_id', 'quantity', 'price', 'shop', 'shop_id']
+
+    def to_internal_value(self, validated_data):
+        """ Заменяет сообщение при отрицательном количестве товара в заказе.
+        """
+        # Встроенная проверка Django полученных полей на корректность.
+        try:
+            ret = super().to_internal_value(validated_data)
+        except ValidationError as e:
+            if 'quantity' in e.args[0] and e.args[0]['quantity'][0].code == 'min_value':
+                e.args[0]['quantity'][0] = ErrorDetail(
+                    string='Заказываемое количества Товара должно быть больше 0.', code='min_value')
+            raise ValidationError(detail=e.args[0])
+
+        return ret
+
+    @staticmethod
+    def validate_info_id(value):
+        """ Проверяет существование Описания товара с номером 'info_id'.
+        """
+        if not models.ProductInfo.objects.filter(id=value).exists():
+            raise ValidationError(f'Описание товара с info_id={value} не найдено.')
+
+        return value
+
+    @staticmethod
+    def validate_quantity(value):
+        """ Проверяет, чтобы количество заказываемого Товара было положительным числом.
+        """
+        if value <= 0:
+            raise ValidationError('Заказываемое количества Товара должно быть больше 0.')
+
+        return value
+
+    @staticmethod
+    def validate_shop_id(value):
+        """ Проверяет существование Магазина с номером 'shop_id'.
+        """
+        if not models.Shop.objects.filter(id=value).exists():
+            raise ValidationError(f'Магазин с shop_id={value} не найден.')
+
+        return value
+
+    def validate(self, attr):
+        """ Проверяет, чтобы Товар имелся в указанном Магазине и был в достаточном количестве.
+        """
+        info_id, quantity, shop_id = attr['product_info']['id'], attr['quantity'], attr['product_info']['shop']['id']
+        if not models.ProductInfo.objects.filter(id=info_id, shop__id=shop_id).exists():
+            err_msg = f'Описание товара с info_id={info_id} в Магазине с shop_id={shop_id} не найдено.'
+            raise ValidationError(detail={'info_id': err_msg})
+
+        remainder = models.ProductInfo.objects.get(id=info_id, shop__id=shop_id).quantity
+        if quantity > remainder:
+            err_msg = (f"Вы пытаетесь добавить в корзину Описание товара с info_id={info_id} в количестве {quantity}"
+                       f" шт, превышающем остаток в Магазине с shop_id={shop_id}, где {remainder} шт.")
+            raise ValidationError(detail={'quantity': err_msg})
+
+        return attr
 
 
 class OrderSerializer(serializers.ModelSerializer):
-    """ Сериализатор для отображения Заказа.
+    """ Сериализатор для создания и отображения Заказа.
     """
-    state = serializers.CharField(source='get_state_display', read_only=True)
-    ordered_items = ShortOrderItemSerializer(read_only=True, many=True)
+    ordered_items = ShortOrderItemSerializer(many=True)
     count = serializers.SerializerMethodField(read_only=True)
+    state = serializers.CharField(source='get_state_display', read_only=True)
+    updated_state = serializers.SerializerMethodField(read_only=True)
+    created_at = serializers.SerializerMethodField(read_only=True)
     customer = serializers.StringRelatedField(read_only=True)
-    contact = ShortContactSerializer(read_only=True)
+    user = serializers.HiddenField(source='customer', default=serializers.CurrentUserDefault())
+    contact = serializers.CharField(source='contact.get_short_contact', read_only=True)
+    contact_id = serializers.CharField(source='contact.id', write_only=True)
 
     class Meta:
         model = models.Order
-        fields = ['id', 'state', 'updated_state', 'ordered_items', 'count', 'sum', 'customer', 'contact',
-                  'created_at']
-        read_only_fields = ['id', 'updated_state', 'sum', 'created_at']
+        fields = ['id', 'ordered_items', 'count', 'sum', 'state', 'updated_state', 'created_at', 'customer', 'user',
+                  'contact', 'contact_id']
+        read_only_fields = ['id', 'sum']
 
     @staticmethod
     def get_count(obj):
         """ Подсчитывает количество Товаров в Заказе.
         """
         return obj.ordered_items.all().count()
+
+    @staticmethod
+    def get_updated_state(obj):
+        """ Отображает время изменения в нужном формате.
+        """
+        return obj.updated_state.strftime("%Y-%m-%d %H:%M")
+
+    @staticmethod
+    def get_created_at(obj):
+        """ Отображает время создания в нужном формате.
+        """
+        return obj.created_at.strftime("%Y-%m-%d %H:%M")
+
+    def to_internal_value(self, validated_data):
+        """ Добавляет собственные предварительные проверки.
+        """
+        # Проверяет наличие товаров в заказе.
+        items = validated_data.get('ordered_items', [])
+        if self.context['view'].action == 'create' and not items:
+            raise ValidationError(detail={'ordered_items': 'Вы не можете создать пустой заказ.'})
+
+        # Проверяет на отсутствие повторяющихся Товаров.
+        infos = [i['info_id'] for i in items if 'info_id' in i]
+        if len(infos) == len(items) and len(set(infos)) < len(items):
+            raise ValidationError(detail={'ordered_items': 'Имеются повторяющиеся товары.'})
+
+        # Встроенная проверка Django полученных полей на корректность.
+        try:
+            ret = super().to_internal_value(validated_data)
+        except ValidationError as e:
+            raise ValidationError(detail=e.args[0])
+
+        return ret
+
+    def validate_contact_id(self, value):
+        """ Проверяет существование Контакта с номером 'contact_id'.
+        """
+        if not models.Contact.objects.filter(salesman=self.context['request'].user, id=value).exists():
+            raise ValidationError(f'У Вас нет контакта с contact_id={value}.')
+
+        return value
+
+    @transaction.atomic
+    def create(self, validated_data):
+        """ Создаёт новый Заказ.
+        """
+        items = validated_data.pop('ordered_items')
+        validated_data['contact'] = models.Contact.objects.get(id=validated_data.pop('contact')['id'])
+
+        order = super().create(validated_data)
+        for item in items:
+            shop = models.Shop.objects.get(id=item['product_info']['shop']['id'])
+            product = models.ProductInfo.objects.get(id=item['product_info']['id'], shop=shop)
+            order.product_infos.add(product, through_defaults={'quantity': item['quantity']})
+
+        return order
